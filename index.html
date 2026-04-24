@@ -502,9 +502,11 @@ function openNote(filename) {
         mathBlocks.push(m.slice(2, -2));
         return '==BLOCKMATH' + id + '==';
       });
-      text = text.replace(/\$([^\s$][\s\S]*?[^\s$])\$/g, function(m) {
+      text = text.replace(/\$([^$]+?)\$/g, function(m) {
+        var inner = m.slice(1, -1).trim();
+        if (!inner) return m;
         var id = mathInlines.length;
-        mathInlines.push(m.slice(1, -1));
+        mathInlines.push(inner);
         return '==INLINEMATH' + id + '==';
       });
 
