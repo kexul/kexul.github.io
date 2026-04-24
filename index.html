@@ -8,8 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked@15.0.6/marked.min.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -495,21 +494,44 @@ function openNote(filename) {
       const dir = filename.substring(0, filename.lastIndexOf('/') + 1);
       text = text.replace(/!\[([^\]]*)\]\((assets\/[^)]+)\)/g, '![$1](notes/' + dir + '$2)');
 
+      // protect math before markdown (which eats _ inside $$)
+      const mathBlocks = [];
+      const mathInlines = [];
+      text = text.replace(/\$\$([\s\S]*?)\$\$/g, function(m) {
+        mathBlocks.push(m);
+        return '⏎BLOCKMATH' + (mathBlocks.length - 1) + '⏎';
+      });
+      text = text.replace(/\$(\S[\s\S]*?\S)\$/g, function(m) {
+        mathInlines.push(m);
+        return '⏎INLINEMATH' + (mathInlines.length - 1) + '⏎';
+      });
+
       // render markdown
       let html = marked.parse(text, { breaks: true, gfm: true });
 
-      content.innerHTML = '<div class="note-rendered">' + html + '</div>';
+      // restore block math with KaTeX
+      html = html.replace(/⏎BLOCKMATH(\d+)⏎/g, function(_, idx) {
+        var raw = mathBlocks[parseInt(idx)];
+        var expr = raw.slice(2, -2);
+        try {
+          return katex.renderToString(expr, { displayMode: true, throwOnError: false });
+        } catch(e) {
+          return '<span class="err">' + raw + '</span>';
+        }
+      });
 
-      // render math with KaTeX
-      if (typeof renderMathInElement === 'function') {
-        renderMathInElement(content, {
-          delimiters: [
-            {left: '$$', right: '$$', display: true},
-            {left: '$', right: '$', display: false}
-          ],
-          throwOnError: false
-        });
-      }
+      // restore inline math with KaTeX
+      html = html.replace(/⏎INLINEMATH(\d+)⏎/g, function(_, idx) {
+        var raw = mathInlines[parseInt(idx)];
+        var expr = raw.slice(1, -1);
+        try {
+          return katex.renderToString(expr, { displayMode: false, throwOnError: false });
+        } catch(e) {
+          return '<span class="err">' + raw + '</span>';
+        }
+      });
+
+      content.innerHTML = '<div class="note-rendered">' + html + '</div>';
 
       document.getElementById('status-filename').textContent = filename;
     })
