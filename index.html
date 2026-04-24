@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kexul · tech</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --base03: #002b36;
+  --base02: #073642;
+  --base01: #586e75;
+  --base00: #657b83;
+  --base0:  #839496;
+  --base1:  #93a1a1;
+  --base2:  #eee8d5;
+  --base3:  #fdf6e3;
+  --yellow: #b58900;
+  --orange: #cb4b16;
+  --red:    #dc322f;
+  --magenta:#d33682;
+  --violet: #6c71c4;
+  --blue:   #268bd2;
+  --cyan:   #2aa198;
+  --green:  #859900;
+}
+
+body {
+  font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  background: var(--base3);
+  color: var(--base00);
+  min-height: 100vh;
+}
+
+/* ── vim chrome ──────────────────────────────────────── */
+.vim {
+  max-width: 820px;
+  margin: 0 auto;
+  border-left: 1px solid var(--base2);
+  border-right: 1px solid var(--base2);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.buf {
+  flex: 1;
+  padding: 0;
+}
+
+.line {
+  display: flex;
+  min-height: 1.6em;
+}
+
+.ln {
+  width: 4ch;
+  text-align: right;
+  padding-right: 1ch;
+  color: var(--base1);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.lc {
+  flex: 1;
+  padding-right: 1ch;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tilde .ln { color: var(--blue); }
+.tilde .lc { color: var(--blue); }
+
+/* ── statusline ──────────────────────────────────────── */
+.statusline {
+  background: var(--base2);
+  color: var(--base01);
+  padding: 0 1ch;
+  display: flex;
+  justify-content: space-between;
+  line-height: 1.8;
+  border-top: 1px solid var(--base1);
+  position: sticky;
+  bottom: 0;
+  font-size: 13px;
+}
+
+.statusline a { color: var(--blue); text-decoration: none; }
+.statusline a:hover { text-decoration: underline; }
+
+/* ── tabline ─────────────────────────────────────────── */
+.tabline {
+  background: var(--base2);
+  display: flex;
+  border-bottom: 1px solid var(--base1);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  overflow-x: auto;
+}
+
+.tabline button {
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--base2);
+  color: var(--base01);
+  border: none;
+  padding: 0 2ch;
+  line-height: 1.8;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tabline button:hover { background: var(--base3); }
+.tabline button.active {
+  background: var(--base3);
+  color: var(--base00);
+  font-weight: bold;
+}
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ── colors ──────────────────────────────────────────── */
+.h1      { color: var(--yellow); font-weight: bold; }
+.h2      { color: var(--orange); font-weight: bold; }
+.comment { color: var(--base1); }
+.keyword { color: var(--green); }
+.string  { color: var(--cyan); }
+.type    { color: var(--violet); }
+.func    { color: var(--blue); }
+.err     { color: var(--red); }
+.ok      { color: var(--green); }
+.num     { color: var(--magenta); }
+.bold    { font-weight: bold; }
+.dim     { color: var(--base1); }
+
+/* ── links ───────────────────────────────────────── */
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── cards / sections inside vim lines ──────────── */
+.section-block {
+  display: block;
+}
+
+.section-block .lc {
+  padding-bottom: 0.3em;
+}
+
+/* ── skill tags inline ─────────────────────────── */
+.skill-tag {
+  color: var(--cyan);
+}
+
+/* ── project items ─────────────────────────────── */
+.proj-name {
+  color: var(--yellow);
+  font-weight: bold;
+}
+
+.proj-desc {
+  color: var(--base0);
+}
+
+.proj-lang {
+  color: var(--magenta);
+}
+
+.proj-stars {
+  color: var(--base1);
+}
+
+/* ── contact links ─────────────────────────────── */
+.contact-list {
+  display: block;
+}
+
+/* ── Cursor blink for the tag line ─────────────── */
+@keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
+.cursor {
+  display: inline-block;
+  width: 8px;
+  height: 1.1em;
+  background: var(--base00);
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+
+/* ── small screens ─────────────────────────────── */
+@media (max-width: 640px) {
+  body { font-size: 12px; }
+  .ln { width: 3ch; }
+}
+</style>
+</head>
+<body>
+<div class="vim">
+
+<!-- ── TABLINE ── -->
+<div class="tabline">
+  <button class="active" data-panel="about">:about</button>
+  <button data-panel="skills">:skills</button>
+  <button data-panel="projects">:projects</button>
+  <button data-panel="blog">:blog</button>
+  <button data-panel="contact">:contact</button>
+</div>
+
+<!-- ── BUFFER ── -->
+<div class="buf">
+
+<!-- ═══ about ═══ -->
+<div id="about" class="panel active">
+  <div class="line"><span class="ln">  1</span><span class="lc"><span class="comment">" ────────────────────────────────────────────────</span></span></div>
+  <div class="line"><span class="ln">  2</span><span class="lc"><span class="comment">"  kexul (Ke) — love science &amp; tech</span></span></div>
+  <div class="line"><span class="ln">  3</span><span class="lc"><span class="comment">" ────────────────────────────────────────────────</span></span></div>
+  <div class="line"><span class="ln">  4</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln">  5</span><span class="lc"><span class="type">let</span> me = {</span></div>
+  <div class="line"><span class="ln">  6</span><span class="lc">  <span class="keyword">name</span>:       <span class="string">"xieweiyang"</span>,</span></div>
+  <div class="line"><span class="ln">  7</span><span class="lc">  <span class="keyword">handle</span>:     <span class="string">"kexul"</span>,</span></div>
+  <div class="line"><span class="ln">  8</span><span class="lc">  <span class="keyword">role</span>:       <span class="string">"game dev"</span>,</span></div>
+  <div class="line"><span class="ln">  9</span><span class="lc">  <span class="keyword">interests</span>:  [<span class="string">"AI/ML"</span>, <span class="string">"dev tools"</span>, <span class="string">"AIGC"</span>, <span class="string">"open source"</span>],</span></div>
+  <div class="line"><span class="ln"> 10</span><span class="lc">  <span class="keyword">languages</span>:  [<span class="string">"Python"</span>, <span class="string">"C++"</span>],</span></div>
+  <div class="line"><span class="ln"> 11</span><span class="lc">}</span></div>
+  <div class="line"><span class="ln"> 12</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 13</span><span class="lc"><span class="comment">"-- about me -------------------------------------------------</span></span></div>
+  <div class="line"><span class="ln"> 14</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 15</span><span class="lc">Hi there 👋, 游戏行业搬砖中。</span></div>
+  <div class="line"><span class="ln"> 18</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 19</span><span class="lc"><span class="comment">"-- highlights ------------------------------------------------</span></span></div>
+  <div class="line"><span class="ln"> 20</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 21</span><span class="lc">  🎮  <span class="func">Game Dev</span>      C++, game AI, RL</span></div>
+  <div class="line"><span class="ln"> 22</span><span class="lc">  🤖  <span class="func">AI / ML</span>        AIGC, TTS, audio processing</span></div>
+  <div class="line"><span class="ln"> 24</span><span class="lc">  📖  <span class="func">Learning</span>      保持好奇, 日拱一卒</span></div>
+  <div class="line"><span class="ln"> 27</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 28</span><span class="lc"><span class="comment">"-- quick links -----------------------------------------------</span></span></div>
+  <div class="line"><span class="ln"> 29</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 30</span><span class="lc">  <a href="https://github.com/kexul" target="_blank">github.com/kexul</a></span></div>
+  <div class="line"><span class="ln"> 31</span><span class="lc">  <a href="https://huggingface.co/kexul" target="_blank">huggingface.co/kexul</a></span></div>
+  <div class="line"><span class="ln"> 32</span><span class="lc">  <a href="mailto:justxwy@126.com">justxwy@126.com</a></span></div>
+  <div class="line"><span class="ln"> 33</span><span class="lc">  <a href="https://x.com/hantmango" target="_blank">x.com/hantmango</a></span></div>
+  <div class="line"><span class="ln"> 33</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 34</span><span class="lc"><span class="comment">"-- </span></span></div>
+  <div class="line"><span class="ln"> 35</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 36</span><span class="lc"><span class="type">:help</span> me build cool stuff <span class="comment">~</span></div>
+  <div class="tilde line"><span class="ln"> 37</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 38</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 39</span><span class="lc">~</span></div>
+</div>
+
+<!-- ═══ skills ═══ -->
+<div id="skills" class="panel">
+  <div class="line"><span class="ln">  1</span><span class="lc"><span class="comment">" ────────────────────────────────────────────────</span></span></div>
+  <div class="line"><span class="ln">  2</span><span class="lc"><span class="comment">"  skills</span></span></div>
+  <div class="line"><span class="ln">  3</span><span class="lc"><span class="comment">" ────────────────────────────────────────────────</span></span></div>
+  <div class="line"><span class="ln">  4</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln">  5</span><span class="lc"><span class="comment">"-- Languages ───────────────────────────────────</span></span></div>
+  <div class="line"><span class="ln">  6</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln">  7</span><span class="lc">  <span class="keyword">Python</span>    <span class="comment">·</span>  main tool</span></div>
+  <div class="line"><span class="ln">  8</span><span class="lc">  <span class="keyword">C++</span>       <span class="comment">·</span>  game dev</span></div>
+  <div class="line"><span class="ln">  9</span><span class="lc">  <span class="keyword">Shell</span>     <span class="comment">·</span>  automation</span></div>
+  <div class="line"><span class="ln"> 10</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 11</span><span class="lc"><span class="comment">"-- Game Engines ────────────────────────────────</span></span></div>
+  <div class="line"><span class="ln"> 12</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 13</span><span class="lc">  <span class="keyword">Unreal Engine</span>  <span class="keyword">Godot</span></div>
+  <div class="line"><span class="ln"> 14</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 15</span><span class="lc"><span class="comment">"-- AI / ML ─────────────────────────────────────</span></span></div>
+  <div class="line"><span class="ln"> 14</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 15</span><span class="lc">  <span class="type">PyTorch</span>  <span class="type">Transformers</span>  <span class="type">TTS</span>  <span class="type">Diffusion</span>  <span class="type">OpenCV</span>  <span class="type">ONNX</span></div>
+  <div class="line"><span class="ln"> 16</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 22</span><span class="lc"><span class="comment">"-- </span></span></div>
+  <div class="line"><span class="ln"> 23</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 24</span><span class="lc"><span class="type">:echo</span> <span class="string">"always learning new things"</span></div>
+  <div class="tilde line"><span class="ln"> 25</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 26</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 27</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 28</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 29</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 30</span><span class="lc">~</span></div>
+</div>
+
+<!-- ═══ projects ═══ -->
+<div id="projects" class="panel">
+  <div class="line"><span class="ln">  1</span><span class="lc"><span class="comment">" ────────────────────────────────────────────────</span></span></div>
+  <div class="line"><span class="ln">  2</span><span class="lc"><span class="comment">"  open source projects</span></span></div>
+  <div class="line"><span class="ln">  3</span><span class="lc"><span class="comment">" ────────────────────────────────────────────────</span></span></div>
+  <div class="line"><span class="ln">  4</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln">  5</span><span class="lc"><span class="comment">"-- pi coding agent ecosystem --------------------</span></span></div>
+  <div class="line"><span class="ln">  6</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln">  7</span><span class="lc">  <a href="https://github.com/kexul/pi-everything-search" target="_blank" class="proj-name">pi-everything-search</a>  <span class="proj-lang">[TypeScript]</span></div>
+  <div class="line"><span class="ln">  8</span><span class="lc">    Windows Everything 搜索引擎扩展，毫秒级文件搜索。</div>
+  <div class="line"><span class="ln">  9</span><span class="lc">    支持通配符、正则、路径过滤。🚀</div>
+  <div class="line"><span class="ln"> 10</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 11</span><span class="lc">  <a href="https://github.com/kexul/confirm-edit" target="_blank" class="proj-name">confirm-edit</a>  <span class="proj-lang">[TypeScript]</span></div>
+  <div class="line"><span class="ln"> 12</span><span class="lc">    在 apply_edit 前弹出确认对话框，防止误修改。</div>
+  <div class="line"><span class="ln"> 13</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 14</span><span class="lc">  <a href="https://github.com/kexul/pi-vscode-files" target="_blank" class="proj-name">pi-vscode-files</a>  <span class="proj-lang">[TypeScript]</span></div>
+  <div class="line"><span class="ln"> 15</span><span class="lc">    @ 自动补全中优先显示 VS Code 当前打开的文件。</div>
+  <div class="line"><span class="ln"> 16</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 17</span><span class="lc">  <a href="https://github.com/kexul/pi-vscode-lite" target="_blank" class="proj-name">pi-vscode-lite</a>  <span class="proj-lang">[JavaScript]</span></div>
+  <div class="line"><span class="ln"> 18</span><span class="lc">    轻量级 VS Code 桥接扩展。</div>
+  <div class="line"><span class="ln"> 19</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 20</span><span class="lc">  <a href="https://github.com/kexul/pi_feishu" target="_blank" class="proj-name">pi_feishu</a>  <span class="proj-lang">[TypeScript]</span>  <span class="proj-stars">★1</span></div>
+  <div class="line"><span class="ln"> 21</span><span class="lc">    飞书消息通知与文档操作集成。</div>
+  <div class="line"><span class="ln"> 22</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 23</span><span class="lc"><span class="comment">"-- tools -----------------------------------------</span></span></div>
+  <div class="line"><span class="ln"> 24</span><span class="lc"> </span></div>
+
+  <div class="line"><span class="ln"> 28</span><span class="lc">  <a href="https://github.com/kexul/vid_compress" target="_blank" class="proj-name">vid_compress</a>  <span class="proj-lang">[Python]</span>  <span class="proj-stars">★1</span></div>
+  <div class="line"><span class="ln"> 29</span><span class="lc">    基于 FFmpeg 的视频压缩工具。</div>
+  <div class="line"><span class="ln"> 30</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 31</span><span class="lc">  <a href="https://github.com/kexul/crop-pdf" target="_blank" class="proj-name">crop-pdf</a>  <span class="proj-lang">[Python]</span>  <span class="proj-stars">★3</span></div>
+  <div class="line"><span class="ln"> 32</span><span class="lc">    PyQt 桌面应用，裁剪 PDF 白边。</div>
+  <div class="line"><span class="ln"> 33</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 34</span><span class="lc"><span class="comment">"-- AI / ML --------------------------------------</span></span></div>
+  <div class="line"><span class="ln"> 35</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 36</span><span class="lc">  <a href="https://github.com/kexul/AIGC-learn" target="_blank" class="proj-name">AIGC-learn</a>  <span class="proj-lang">[Python]</span></div>
+  <div class="line"><span class="ln"> 37</span><span class="lc">    生成式 AI 学习笔记与实践代码。</div>
+  <div class="line"><span class="ln"> 38</span><span class="lc"> </span></div>
+
+  <div class="line"><span class="ln"> 42</span><span class="lc"><span class="comment">"-- </span></span></div>
+  <div class="line"><span class="ln"> 43</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 44</span><span class="lc"><span class="type">:echo</span> <span class="string">"all repos → "</span><a href="https://github.com/kexul?tab=repositories" target="_blank">github.com/kexul</a></div>
+  <div class="tilde line"><span class="ln"> 45</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 46</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 47</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 48</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 49</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 50</span><span class="lc">~</span></div>
+</div>
+
+<!-- ═══ blog ═══ -->
+<div id="blog" class="panel">
+  <div class="line"><span class="ln">  1</span><span class="lc"><span class="comment">" ────────────────────────────────────────────────</span></span></div>
+  <div class="line"><span class="ln">  2</span><span class="lc"><span class="comment">"  blog / notes</span></span></div>
+  <div class="line"><span class="ln">  3</span><span class="lc"><span class="comment">" ────────────────────────────────────────────────</span></span></div>
+  <div class="line"><span class="ln">  4</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln">  5</span><span class="lc">  <span class="num">2026-04</span>  <span class="func">Stable Diffusion 学习笔记</span>  <span class="comment">DDPM / VAE / VQVAE / Transformer</span></div>
+  <div class="line"><span class="ln">  6</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln">  7</span><span class="lc">  <span class="comment">├── </span><a href="#" onclick="openNote('DDPM.md');return false">DDPM.md</a>         <span class="comment">扩散模型原理</span></div>
+  <div class="line"><span class="ln">  8</span><span class="lc">  <span class="comment">├── </span><a href="#" onclick="openNote('VAE.md');return false">VAE.md</a>          <span class="comment">变分自编码器</span></div>
+  <div class="line"><span class="ln">  9</span><span class="lc">  <span class="comment">├── </span><a href="#" onclick="openNote('VQVAE.md');return false">VQVAE.md</a>        <span class="comment">矢量量化 VAE</span></div>
+  <div class="line"><span class="ln"> 10</span><span class="lc">  <span class="comment">├── </span><a href="#" onclick="openNote('Transformer.md');return false">Transformer.md</a>  <span class="comment">Attention 机制</span></div>
+  <div class="line"><span class="ln"> 11</span><span class="lc">  <span class="comment">├── </span><a href="#" onclick="openNote('正则化.md');return false">正则化.md</a>       <span class="comment">扩散模型正则化</span></div>
+  <div class="line"><span class="ln"> 12</span><span class="lc">  <span class="comment">├── </span><a href="#" onclick="openNote('二维.md');return false">二维.md</a>         <span class="comment">二维潜在空间</span></div>
+  <div class="line"><span class="ln"> 13</span><span class="lc">  <span class="comment">├── </span><a href="#" onclick="openNote('离散.md');return false">离散.md</a>         <span class="comment">离散扩散模型</span></div>
+  <div class="line"><span class="ln"> 14</span><span class="lc">  <span class="comment">└── </span><a href="#" onclick="openNote('VAE/贝叶斯公式.md');return false">VAE/贝叶斯公式.md</a>  <span class="comment">贝叶斯公式</span></div>
+  <div class="line"><span class="ln"> 15</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 15</span><span class="lc"><span class="comment">"-- </span></span></div>
+  <div class="line"><span class="ln"> 16</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 17</span><span class="lc"><span class="type">:echo</span> <span class="string">"stay tuned..."</span></div>
+  <div class="tilde line"><span class="ln"> 18</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 19</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 20</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 21</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 22</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 23</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 24</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 25</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 26</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 27</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 28</span><span class="lc">~</span></div>
+</div>
+
+<!-- ═══ contact ═══ -->
+<div id="contact" class="panel">
+  <div class="line"><span class="ln">  1</span><span class="lc"><span class="comment">" ────────────────────────────────────────────────</span></span></div>
+  <div class="line"><span class="ln">  2</span><span class="lc"><span class="comment">"  contact</span></span></div>
+  <div class="line"><span class="ln">  3</span><span class="lc"><span class="comment">" ────────────────────────────────────────────────</span></span></div>
+  <div class="line"><span class="ln">  4</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln">  5</span><span class="lc"><span class="comment">"-- reach me at ─────────────────────────────────</span></span></div>
+  <div class="line"><span class="ln">  6</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln">  7</span><span class="lc">  <a href="https://github.com/kexul" target="_blank">GitHub</a>       <span class="comment">github.com/kexul</span></div>
+  <div class="line"><span class="ln">  8</span><span class="lc">  <a href="https://huggingface.co/kexul" target="_blank">Hugging Face</a>  <span class="comment">huggingface.co/kexul</span></div>
+  <div class="line"><span class="ln">  9</span><span class="lc">  <a href="mailto:justxwy@126.com">Email</a>        <span class="comment">justxwy@126.com</span></div>
+  <div class="line"><span class="ln"> 10</span><span class="lc">  <a href="https://x.com/hantmango" target="_blank">X / Twitter</a>  <span class="comment">x.com/hantmango</span></div>
+  <div class="line"><span class="ln"> 11</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 11</span><span class="lc"><span class="comment">"-- </span></span></div>
+  <div class="line"><span class="ln"> 12</span><span class="lc"> </span></div>
+  <div class="line"><span class="ln"> 13</span><span class="lc"><span class="type">:echo</span> <span class="string">"feel free to reach out!"</span></div>
+  <div class="tilde line"><span class="ln"> 14</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 15</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 16</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 17</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 18</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 19</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 20</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 21</span><span class="lc">~</span></div>
+  <div class="tilde line"><span class="ln"> 22</span><span class="lc">~</span></div>
+</div>
+
+<!-- ═══ note viewer ═══ -->
+<div id="note-viewer" class="panel">
+  <div class="line"><span class="ln">  1</span><span class="lc"><span class="comment">" notes/</span><span id="note-filename"></span> <a href="#" onclick="backToBlog();return false" style="color:var(--blue)">[x]</a></span></div>
+  <div id="note-content"></div>
+</div>
+
+</div><!-- /buf -->
+
+<!-- ── STATUSLINE ── -->
+<div class="statusline">
+  <span><a href="https://github.com/kexul/kexul.github.io">kexul.github.io</a> <span id="status-filename" class="dim"></span></span>
+  <span>tech notes <span id="status-time"></span></span>
+</div>
+
+</div><!-- /vim -->
+
+<script>
+// ── tab switching ──
+const buttons = document.querySelectorAll('.tabline button');
+const panels = {};
+
+buttons.forEach(btn => {
+  const id = btn.dataset.panel;
+  panels[id] = document.getElementById(id);
+  btn.addEventListener('click', () => {
+    buttons.forEach(b => b.classList.remove('active'));
+    Object.values(panels).forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    panels[id].classList.add('active');
+  });
+});
+
+// ── clock in statusline ──
+function updateTime() {
+  const now = new Date();
+  const t = now.toTimeString().slice(0,5);
+  document.getElementById('status-time').textContent = t;
+}
+updateTime();
+setInterval(updateTime, 10000);
+
+// ── note viewer ──
+
+function openNote(filename) {
+  const viewer = document.getElementById('note-viewer');
+  const content = document.getElementById('note-content');
+
+  // show filename in header
+  document.getElementById('note-filename').textContent = filename;
+
+  // switch to note-viewer panel
+  document.querySelectorAll('.tabline button').forEach(b => b.classList.remove('active'));
+  Object.values(panels).forEach(p => p.classList.remove('active'));
+  viewer.classList.add('active');
+
+  content.innerHTML = '<div class="line"><span class="ln"> ~</span><span class="lc"><span class="comment">loading...</span></span></div>';
+
+  const url = 'notes/' + filename.split('/').map(s => encodeURIComponent(s)).join('/');
+  fetch(url)
+    .then(r => {
+      if (!r.ok) throw new Error('not found');
+      return r.text();
+    })
+    .then(text => {
+      const lines = text.split('\n');
+      let html = '';
+      const pad = String(lines.length).length;
+      lines.forEach((line, i) => {
+        const n = String(i + 1).padStart(pad, ' ');
+        if (line.trim() === '') {
+          html += '<div class="line"><span class="ln">' + n + '</span><span class="lc"> </span></div>';
+        } else {
+          html += '<div class="line"><span class="ln">' + n + '</span><span class="lc">' + escapeHtml(line) + '</span></div>';
+        }
+      });
+      content.innerHTML = html;
+      document.getElementById('status-filename').textContent = filename;
+    })
+    .catch(err => {
+      content.innerHTML = '<div class="line"><span class="ln">  1</span><span class="lc"><span class="err">Error: failed to load note</span></span></div>';
+    });
+}
+
+function backToBlog() {
+  document.querySelectorAll('.tabline button').forEach(b => b.classList.remove('active'));
+  Object.values(panels).forEach(p => p.classList.remove('active'));
+  document.querySelector('.tabline button[data-panel="blog"]').classList.add('active');
+  document.getElementById('blog').classList.add('active');
+  document.getElementById('status-filename').textContent = '';
+  document.getElementById('note-filename').textContent = '';
+}
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+</script>
+</body>
+</html>
