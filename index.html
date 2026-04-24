@@ -372,7 +372,7 @@ a:hover { text-decoration: underline; }
   <div class="line"><span class="ln">  2</span><span class="lc"><span class="comment">"  blog / notes</span></span></div>
   <div class="line"><span class="ln">  3</span><span class="lc"><span class="comment">" ────────────────────────────────────────────────</span></span></div>
   <div class="line"><span class="ln">  4</span><span class="lc"> </span></div>
-  <div class="line"><span class="ln">  5</span><span class="lc">  <span class="num">2026-04</span>  <a href="#" onclick="openNote('Stable diffusion历史.md');return false" class="func">Stable Diffusion 学习笔记</a>  <span class="comment">DDPM / VAE / VQGAN / SD</span></div>
+  <div class="line"><span class="ln">  5</span><span class="lc">  <span class="num">2026-04</span>  <a href="#" onclick="openNote('sd-history.md');return false" class="func">Stable Diffusion 学习笔记</a>  <span class="comment">DDPM / VAE / VQGAN / SD</span></div>
   <div class="line"><span class="ln">  6</span><span class="lc"> </span></div>
   <div class="line"><span class="ln">  7</span><span class="lc"><span class="comment">"--  </span></span></div>
   <div class="line"><span class="ln">  8</span><span class="lc"> </span></div>
@@ -529,7 +529,8 @@ function openNote(filename) {
       document.getElementById('status-filename').textContent = filename;
     })
     .catch(err => {
-      content.innerHTML = '<div class="line"><span class="ln">  1</span><span class="lc"><span class="err">Error: failed to load note</span></span></div>';
+      console.error('openNote error:', err);
+      content.innerHTML = '<div class="line"><span class="ln">  1</span><span class="lc"><span class="err">Error: ' + escapeHtml(String(err)) + '</span></span></div>';
     });
 }
 
