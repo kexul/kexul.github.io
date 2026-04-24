@@ -463,6 +463,9 @@ setInterval(updateTime, 10000);
 
 // ── note viewer ──
 
+// Store openNote errors for debugging
+window.__noteErrors = [];
+
 function openNote(filename) {
   const viewer = document.getElementById('note-viewer');
   const content = document.getElementById('note-content');
@@ -475,58 +478,22 @@ function openNote(filename) {
   Object.values(panels).forEach(p => p.classList.remove('active'));
   viewer.classList.add('active');
 
-  content.innerHTML = '<div class="line"><span class="ln"> ~</span><span class="lc"><span class="comment">loading...</span></span></div>';
+  content.innerHTML = '<div class="line"><span class="ln"> ~</span><span class="lc">loading...</span></div>';
 
   const url = 'notes/' + filename.split('/').map(s => encodeURIComponent(s)).join('/');
   fetch(url)
     .then(r => {
-      if (!r.ok) throw new Error('not found');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.text();
     })
     .then(text => {
-      // fix image paths: assets/ → notes/assets/
-      const dir = filename.substring(0, filename.lastIndexOf('/') + 1);
-      text = text.replace(/!\[([^\]]*)\]\((assets\/[^)]+)\)/g, '![$1](notes/' + dir + '$2)');
-
-      // protect math before markdown (which eats _ inside $$)
-      const mathBlocks = [];
-      const mathInlines = [];
-      text = text.replace(/\$\$([\s\S]*?)\$\$/g, function(m) {
-        var id = mathBlocks.length;
-        mathBlocks.push(m.slice(2, -2));
-        return '==BLOCKMATH' + id + '==';
-      });
-      text = text.replace(/\$([^$]+?)\$/g, function(m) {
-        var inner = m.slice(1, -1).trim();
-        if (!inner) return m;
-        var id = mathInlines.length;
-        mathInlines.push(inner);
-        return '==INLINEMATH' + id + '==';
-      });
-
-      // render markdown
-      let html = marked.parse(text, { breaks: true, gfm: true });
-
-      // escape HTML in math expressions before injection
-      function renderAndEscape(mathExpr, displayMode) {
-        try {
-          return katex.renderToString(mathExpr, { displayMode: displayMode, throwOnError: true });
-        } catch(e) {
-          return '<span class="err">' + escapeHtml(mathExpr) + '</span>';
-        }
-      }
-
-      // restore block math
-      html = html.replace(/==BLOCKMATH(\d+)==/g, function(_, id) {
-        return renderAndEscape(mathBlocks[parseInt(id)], true);
-      });
-      // restore inline math
-      html = html.replace(/==INLINEMATH(\d+)==/g, function(_, id) {
-        return renderAndEscape(mathInlines[parseInt(id)], false);
-      });
-
-      content.innerHTML = '<div class="note-rendered">' + html + '</div>';
-
+      // show raw text first (simple fallback)
+      var lines = text.split('\n');
+      var rawHtml = lines.map(function(l, i) {
+        var esc = l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return '<div class="line"><span class="lc">' + esc + '</span></div>';
+      }).join('');
+      content.innerHTML = rawHtml;
       document.getElementById('status-filename').textContent = filename;
     })
     .catch(err => {
