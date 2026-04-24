@@ -498,37 +498,35 @@ function openNote(filename) {
       const mathBlocks = [];
       const mathInlines = [];
       text = text.replace(/\$\$([\s\S]*?)\$\$/g, function(m) {
-        mathBlocks.push(m);
-        return '⏎BLOCKMATH' + (mathBlocks.length - 1) + '⏎';
+        var id = mathBlocks.length;
+        mathBlocks.push(m.slice(2, -2));
+        return '==BLOCKMATH' + id + '==';
       });
-      text = text.replace(/\$(\S[\s\S]*?\S)\$/g, function(m) {
-        mathInlines.push(m);
-        return '⏎INLINEMATH' + (mathInlines.length - 1) + '⏎';
+      text = text.replace(/\$([^\s$][\s\S]*?[^\s$])\$/g, function(m) {
+        var id = mathInlines.length;
+        mathInlines.push(m.slice(1, -1));
+        return '==INLINEMATH' + id + '==';
       });
 
       // render markdown
       let html = marked.parse(text, { breaks: true, gfm: true });
 
-      // restore block math with KaTeX
-      html = html.replace(/⏎BLOCKMATH(\d+)⏎/g, function(_, idx) {
-        var raw = mathBlocks[parseInt(idx)];
-        var expr = raw.slice(2, -2);
+      // escape HTML in math expressions before injection
+      function renderAndEscape(mathExpr, displayMode) {
         try {
-          return katex.renderToString(expr, { displayMode: true, throwOnError: false });
+          return katex.renderToString(mathExpr, { displayMode: displayMode, throwOnError: true });
         } catch(e) {
-          return '<span class="err">' + raw + '</span>';
+          return '<span class="err">' + escapeHtml(mathExpr) + '</span>';
         }
-      });
+      }
 
-      // restore inline math with KaTeX
-      html = html.replace(/⏎INLINEMATH(\d+)⏎/g, function(_, idx) {
-        var raw = mathInlines[parseInt(idx)];
-        var expr = raw.slice(1, -1);
-        try {
-          return katex.renderToString(expr, { displayMode: false, throwOnError: false });
-        } catch(e) {
-          return '<span class="err">' + raw + '</span>';
-        }
+      // restore block math
+      html = html.replace(/==BLOCKMATH(\d+)==/g, function(_, id) {
+        return renderAndEscape(mathBlocks[parseInt(id)], true);
+      });
+      // restore inline math
+      html = html.replace(/==INLINEMATH(\d+)==/g, function(_, id) {
+        return renderAndEscape(mathInlines[parseInt(id)], false);
       });
 
       content.innerHTML = '<div class="note-rendered">' + html + '</div>';
@@ -547,6 +545,10 @@ function backToBlog() {
   document.getElementById('blog').classList.add('active');
   document.getElementById('status-filename').textContent = '';
   document.getElementById('note-filename').textContent = '';
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 </script>
 </body>
