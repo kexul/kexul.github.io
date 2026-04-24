@@ -464,39 +464,50 @@ setInterval(updateTime, 10000);
 window.__noteErrors = [];
 
 function openNote(filename) {
-  const viewer = document.getElementById('note-viewer');
-  const content = document.getElementById('note-content');
+  try {
+    console.log('openNote called with:', filename);
+    const viewer = document.getElementById('note-viewer');
+    const content = document.getElementById('note-content');
+    const fnEl = document.getElementById('note-filename');
+    const sfEl = document.getElementById('status-filename');
 
-  // show filename in header
-  document.getElementById('note-filename').textContent = filename;
+    if (!viewer || !content || !fnEl) {
+      console.error('Missing elements:', {viewer:!!viewer, content:!!content, fnEl:!!fnEl});
+      return;
+    }
 
-  // switch to note-viewer panel
-  document.querySelectorAll('.tabline button').forEach(b => b.classList.remove('active'));
-  Object.values(panels).forEach(p => p.classList.remove('active'));
-  viewer.classList.add('active');
+    fnEl.textContent = filename;
 
-  content.innerHTML = '<div class="line"><span class="ln"> ~</span><span class="lc">loading...</span></div>';
+    document.querySelectorAll('.tabline button').forEach(function(b) { b.classList.remove('active'); });
+    Object.values(panels).forEach(function(p) { p.classList.remove('active'); });
+    viewer.classList.add('active');
 
-  const url = 'notes/' + filename.split('/').map(s => encodeURIComponent(s)).join('/');
-  fetch(url)
-    .then(r => {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.text();
-    })
-    .then(text => {
-      // show raw text first (simple fallback)
-      var lines = text.split('\n');
-      var rawHtml = lines.map(function(l, i) {
-        var esc = l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        return '<div class="line"><span class="lc">' + esc + '</span></div>';
-      }).join('');
-      content.innerHTML = rawHtml;
-      document.getElementById('status-filename').textContent = filename;
-    })
-    .catch(err => {
-      console.error('openNote error:', err);
-      content.innerHTML = '<div class="line"><span class="ln">  1</span><span class="lc"><span class="err">Error: ' + escapeHtml(String(err)) + '</span></span></div>';
-    });
+    content.innerHTML = '<div class="line"><span class="lc">loading...</span></div>';
+
+    var url = 'notes/' + filename.split('/').map(function(s) { return encodeURIComponent(s); }).join('/');
+    console.log('Fetching:', url);
+    fetch(url)
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      })
+      .then(function(text) {
+        var lines = text.split('\n');
+        var rawHtml = lines.map(function(l) {
+          var esc = l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          return '<div class="line"><span class="lc">' + esc + '</span></div>';
+        }).join('');
+        content.innerHTML = rawHtml;
+        if (sfEl) sfEl.textContent = filename;
+        console.log('Note loaded, lines:', lines.length);
+      })
+      .catch(function(err) {
+        console.error('openNote fetch error:', err);
+        content.innerHTML = '<div class="line"><span class="lc"><span class="err">Error: ' + err.message + '</span></span></div>';
+      });
+  } catch(e) {
+    console.error('openNote sync error:', e);
+  }
 }
 
 function backToBlog() {
@@ -506,10 +517,6 @@ function backToBlog() {
   document.getElementById('blog').classList.add('active');
   document.getElementById('status-filename').textContent = '';
   document.getElementById('note-filename').textContent = '';
-}
-
-function escapeHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 </script>
 </body>
