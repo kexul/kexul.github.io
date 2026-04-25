@@ -500,7 +500,15 @@ function openNote(filename) {
         // render with marked, fallback to raw text
         try {
           var html = marked.parse(text, { breaks: true, gfm: true });
-          content.innerHTML = '<div class="note-rendered">' + html + '</div>';
+          content.innerHTML = '<div class="note-rendered" id="note-rendered">' + html + '</div>';
+          // make links to .md files open via openNote
+          document.getElementById('note-rendered').addEventListener('click', function(e) {
+            var link = e.target.closest('a');
+            if (link && link.getAttribute('href').endsWith('.md')) {
+              e.preventDefault();
+              openNote(link.getAttribute('href'));
+            }
+          });
         } catch(e) {
           console.error('marked error:', e);
           // fallback: raw text

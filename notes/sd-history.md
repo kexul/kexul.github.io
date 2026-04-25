@@ -2,7 +2,7 @@
 
 > 本文大部分内容参考/摘自 [天才程序员周弈帆](https://zhuanlan.zhihu.com/p/676705162) 的文章，感谢作者的精彩分享。
 
-### AE (Auto Encoder， 自动编码器)
+### [AE (Auto Encoder， 自动编码器)](AE.md)
 
 所谓自动编码器，其实就是自动压缩器。先把图片压缩到一个小向量，然后再从小向量中解压。  
 网络结构设计成一个漏斗形，这样就只有重要的特征能保留下来，无关的噪声被剔除。  
@@ -11,7 +11,7 @@
 
 ![image](assets/image-20240424203748-ssa7600.png)
 
-### VAE (Variational Autoencoder，变分自编码器)
+### [VAE (Variational Autoencoder，变分自编码器)](VAE.md)
 
 在AE的基础上添加一个约束，使得压缩之后的图片接近正态分布。这样就可以从任意正态分布解压出图片。这样，训练目标就变成了：
 
@@ -23,7 +23,7 @@
 
 ![image](assets/image-20240424203813-7kmqf0y.png)
 
-### DDPM (Denoising Diffusion Probabilistic Model)
+### [DDPM (Denoising Diffusion Probabilistic Model)](DDPM.md)
 
 去掉可学习的编码器，把原图多次加噪声，得到正态分布，神经网络学习多次去噪。  
 所谓的学习去噪就是输入图片，预测噪声，预测出来的噪声要跟真实的噪声差不多。  
@@ -31,7 +31,7 @@
 
 ![image](assets/image-20240424205316-n4a0ecd.png)
 
-### VQVAE (**Vector Quantised-Variational AutoEncoder) &amp; VQGAN**
+### [VQVAE &amp; VQGAN](VQVAE.md)
 
 AE其实把图片压缩成了一维向量，VQVAE可以把图片压缩成离散​二维向量，相当于一个按比例缩放的小图。为了用VQVAE生成图像需要：
 
