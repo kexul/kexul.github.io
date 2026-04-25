@@ -1,43 +1,21 @@
-# TODO
+# Performance TODO
 
-## Goal
-短笔记（≤ 20 行）在鼠标悬停时直接显示渲染后的完整 Markdown 内容，不再需要点击跳转。长笔记保持现有模态弹窗行为不变。
+## 已完成
+- [x] 下载 marked.min.js / katex.min.js / katex.min.css 到 vendor/
+- [x] 下载 KaTeX woff2 字体到 vendor/fonts/
+- [x] katex.min.css 精简为仅 woff2（60→20 字体引用）
+- [x] index.html: 替换 CDN preload 为本地 `<link>` + `<script>`
+- [x] index.html: 删除 `loadLib()` 函数，简化 `fetchNoteContent()` 和 `openNote()`
+- [x] 图片加 `loading="lazy"`
+- [x] busuanzi 脚本 `defer` → `async`
+- [x] katex.css 改为按需加载（随 JS 库一起动态插入）
+- [x] marked.js + katex.js 改为按需加载（首次交互时才开始加载）
+- [x] 首屏零 JS 阻塞 — 所有 JS 延迟到用户第一次 hover/click 才加载
+- [x] 添加 `<meta name="description">` 和 `<meta name="color-scheme">`
 
-## Tasks
-
-### 1. 定义短笔记列表 & 添加 CSS 工具提示样式
-- [x] 在 `index.html` 中硬编码短笔记文件名列表（按行数 ≤ 20 判定）
-- [x] 添加 `.note-tooltip` 弹出层 CSS（固定定位、阴影、最大宽高、滚动、Solarized 配色）
-- [x] 添加 `.note-tooltip` 内部 `.note-rendered` 样式复用（内容渲染风格与模态一致）
-
-### 2. 添加工具提示 HTML 容器
-- [x] 在 `<body>` 末尾添加一个 `<div class="note-tooltip" id="note-tooltip">` 作为工具提示容器
-- [x] 容器初始 `display: none`，JS 控制显示/隐藏/定位
-
-### 3. 实现工具提示核心逻辑（JS）
-- [x] 添加 `shortNotes` 集合（包含所有 ≤ 20 行的笔记文件名）
-- [x] 实现 `noteTooltipCache` 对象，缓存已获取的短笔记内容
-- [x] 实现 `renderTooltipContent(text, filename)`：用 marked + KaTeX 渲染 Markdown
-- [x] 实现 `showNoteTooltip(filename, linkEl)`：获取内容 → 渲染 → 定位 → 显示
-- [x] 实现 `hideNoteTooltip()` + 延迟隐藏机制（鼠标移到 tooltip 上不消失）
-- [x] 定位策略：在链接附近显示，超出视口时自动调整
-
-### 4. 为模态内的笔记链接添加 hover 支持
-- [x] 在 `openNote` 的 `.md` 链接拦截代码中，对每个短笔记链接添加 `mouseenter` / `mouseleave` 事件
-- [x] 模态内的长笔记链接保持现有点击行为不变
-
-### 5. 测试
-- [x] 代码审阅通过：shortNotes 集合、CSS、渲染函数、定位、延迟隐藏逻辑均正确
-- [x] 修复：将 `DOMContentLoaded` 改为即时执行，确保 tooltip 事件绑定生效
-- [x] 修复：marked 对中文链接做 URL 编码导致 `isShortNote` 匹配失败，增加 `decodeURIComponent` 处理
-- [ ] 用户需要在浏览器中手动验证交互效果
-
-### 6. 短笔记链接交互优化
-- [x] 短笔记链接加 `.note-hover` 下划线样式（青色下划线，`cursor: default`）
-- [x] 短笔记链接点击仅 `preventDefault`，不打开模态
-- [x] 长笔记链接保持原有点击弹窗行为
-
-## Notes
-- 短笔记判定标准：行数 ≤ 20（含空行）。当前符合条件的笔记：`感知误差.md`(5行)、`二维.md`(10行)、`离散.md`(9行)、`离散/嵌入向量.md`(14行)、`Transformer.md`(7行)、`cross-attention.md`(20行)、`patch的对抗误差约束.md`(3行)
-- 渲染复用现有 `marked.js` + `KaTeX` 库（已加载到页面中）
-- 长笔记（≥ 21 行）保持现有模态弹窗行为不变
+## 可选优化（后续）
+- [ ] 用 gzip/brotli 预压缩 vendor 文件（GitHub Pages 自动 brotli/gzip）
+- [ ] 考虑用更轻量的 markdown 解析器替换 marked (39KB → 可能 10KB 以内)
+- [ ] 考虑将 marked + katex 打包合并为一个请求（减少 HTTP 连接数）
+- [ ] Service Worker 缓存（离线访问 + 二次加载零延迟）
+- [ ] 添加 `<link rel="prefetch">` 在首屏加载后预取可能用到的笔记

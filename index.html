@@ -4,10 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>kexul · tech</title>
-<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="preload" href="https://cdn.jsdelivr.net/npm/marked@15.0.6/marked.min.js" as="script">
-<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" as="script">
-<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" as="style">
+<meta name="description" content="在游戏行业做AIGC的程序员">
+<meta name="color-scheme" content="light">
+<!-- KaTeX CSS loaded on demand with JS libs -->
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 
@@ -217,19 +216,17 @@ a.note-hover { color: var(--base00); text-decoration: underline; text-underline-
 <div id="about" class="section">
   <div class="line"><span class="lc"> </span></div>
   <div class="line"><span class="lc">在游戏行业做AIGC的程序员</span></div>
-  <div class="line"><span class="lc"><span class="dim">访问量 <span id="busuanzi_value_site_pv">…</span></span></span></div>
   <div class="line"><span class="lc"> </span></div>
 </div>
 
 <div id="blog" class="section">
   <div class="line"><span class="lc"> </span></div>
-  <div class="line"><span class="lc">2025-04  <a href="#" onclick="openNote('sd-history.md');return false">Stable Diffusion 学习笔记</a>  DDPM / VAE / VQGAN / UNet / SD</span></div>
+  <div class="line"><span class="lc">2025-04  <a href="notes/sd-history.md" onclick="openNote('sd-history.md');return false">Stable Diffusion 学习笔记</a>  DDPM / VAE / VQGAN / UNet / SD</span></div>
   <div class="line"><span class="lc"> </span></div>
 </div>
 
 </div><!-- /buf -->
 
-<script defer src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" onerror="document.getElementById('busuanzi_value_site_pv').textContent='-'"></script>
 </div><!-- /vim -->
 
 <div class="modal-overlay" id="modal-overlay">
@@ -245,27 +242,12 @@ a.note-hover { color: var(--base00); text-decoration: underline; text-underline-
 
 <div class="note-tooltip" id="note-tooltip"></div>
 
+<script>var _libsReady=false,_libCbs=[];function onLibsReady(fn){if(_libsReady)fn();else _libCbs.push(fn);}function _libsLoaded(){_libsReady=true;_libCbs.forEach(function(fn){fn();});_libCbs=null;}</script>
+<script>function ldLibs(){var css=document.createElement('link');css.rel='stylesheet';css.href='vendor/katex.min.css';document.head.appendChild(css);var loaded=0;function check(){if(++loaded===2)_libsLoaded();}var s1=document.createElement('script');s1.src='vendor/marked.min.js';s1.onload=check;document.body.appendChild(s1);var s2=document.createElement('script');s2.src='vendor/katex.min.js';s2.onload=check;document.body.appendChild(s2);}</script>
 <script>
-// ── async library loader (load once, cache) ──
-function loadLib(src, isCSS) {
-  return new Promise(function(resolve, reject) {
-    if (isCSS) {
-      var el = document.querySelector('link[href="' + src + '"]');
-      if (el) return resolve();
-      var link = document.createElement('link');
-      link.rel = 'stylesheet'; link.href = src;
-      link.onload = resolve; link.onerror = reject;
-      document.head.appendChild(link);
-    } else {
-      var el = document.querySelector('script[src="' + src + '"]');
-      if (el) return resolve();
-      var s = document.createElement('script');
-      s.src = src;
-      s.onload = resolve; s.onerror = reject;
-      document.head.appendChild(s);
-    }
-  });
-}
+// Load libs on first interaction
+var _libsLoading=false;
+function ensureLibs(){if(_libsReady)return Promise.resolve();if(!_libsLoading){_libsLoading=true;ldLibs();}return new Promise(function(res){onLibsReady(res);});}
 
 // ── note tooltip (hover over short notes) ──
 var shortNotes = new Set([
@@ -309,6 +291,7 @@ function renderMarkdown(text, dir) {
     return '==INLINEMATH' + id + '==';
   });
   var html = marked.parse(text, { breaks: true, gfm: true });
+  html = html.replace(/<img /g, '<img loading="lazy" ');
   html = html.replace(/==BLOCKMATH(\d+)==/g, function(_, id) {
     try { return katex.renderToString(mathBlocks[parseInt(id)], { displayMode: true, throwOnError: false }); }
     catch(e) { return mathBlocks[parseInt(id)]; }
@@ -321,20 +304,42 @@ function renderMarkdown(text, dir) {
 }
 
 function fetchNoteContent(filename) {
-  return Promise.all([
-    loadLib('https://cdn.jsdelivr.net/npm/marked@15.0.6/marked.min.js'),
-    loadLib('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css', true),
-    loadLib('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js')
-  ]).then(function() {
-    return fetch('notes/' + filename);
-  }).then(function(r) {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.text();
-  }).then(function(text) {
-    var dir = filename.substring(0, filename.lastIndexOf('/') + 1);
-    return renderMarkdown(text, dir);
-  });
+  return fetch('notes/' + filename)
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    }).then(function(text) {
+      var dir = filename.substring(0, filename.lastIndexOf('/') + 1);
+      return renderMarkdown(text, dir);
+    });
 }
+
+// Preload libs on idle (after page paint) so they're ready when user clicks
+if ('requestIdleCallback' in window) {
+  requestIdleCallback(function() { ensureLibs(); }, {timeout: 2000});
+} else {
+  setTimeout(function() { ensureLibs(); }, 300);
+}
+
+// Prefetch the main note content on idle
+(function() {
+  var prefetched = false;
+  function prefetch() {
+    if (prefetched) return;
+    prefetched = true;
+    fetch('notes/sd-history.md').then(function(r) {
+      if (!r.ok) return;
+      return r.text();
+    }).then(function(text) {
+      if (text) window._prefetchedSdHistory = text;
+    }).catch(function() {});
+  }
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(prefetch, {timeout: 3000});
+  } else {
+    setTimeout(prefetch, 500);
+  }
+})();
 
 function positionTooltip(linkEl) {
   var tip = document.getElementById('note-tooltip');
@@ -376,7 +381,7 @@ function showNoteTooltip(filename, linkEl) {
     tip.classList.add('visible');
     positionTooltip(linkEl);
 
-    fetchNoteContent(filename).then(function(html) {
+    ensureLibs().then(function() { return fetchNoteContent(filename); }).then(function(html) {
       noteTooltipCache[filename] = html;
       if (tip._currentFilename === filename && tip.classList.contains('visible')) {
         tip.innerHTML = html;
@@ -441,42 +446,44 @@ function openNote(filename, noHistory) {
   buf.innerHTML = 'loading...';
   overlay.classList.add('open');
 
-  fetch('notes/' + filename)
-    .then(function(r) {
+  // Start libs loading and note fetching in parallel
+  var libsP = ensureLibs();
+  var textP;
+  if (filename === 'sd-history.md' && window._prefetchedSdHistory) {
+    textP = Promise.resolve(window._prefetchedSdHistory);
+    window._prefetchedSdHistory = null;
+  } else {
+    textP = fetch('notes/' + filename).then(function(r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.text();
-    })
-    .then(function(text) {
-      return Promise.all([
-        loadLib('https://cdn.jsdelivr.net/npm/marked@15.0.6/marked.min.js'),
-        loadLib('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css', true),
-        loadLib('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js')
-      ]).then(function() {
-        var dir = filename.substring(0, filename.lastIndexOf('/') + 1);
-      buf.innerHTML = renderMarkdown(text, dir);
-
-      // restore scroll position when coming back
-      if (restoreScroll > 0) {
-        buf.scrollTop = restoreScroll;
-        restoreScroll = 0;
-      }
-
-      // ── hover tooltips for short notes ──
-      buf.querySelectorAll('a[href$=".md"]').forEach(function(a) {
-        var href = a.getAttribute('href');
-        var decoded;
-        try { decoded = decodeURIComponent(href); } catch(e) { decoded = href; }
-        if (isShortNote(decoded)) {
-          a.classList.add('note-hover');
-          a.addEventListener('mouseenter', function() { showNoteTooltip(decoded, a); });
-          a.addEventListener('mouseleave', function() { hideNoteTooltip(); });
-        }
-      });
-      });
-    })
-    .catch(function(err) {
-      buf.innerHTML = '<span class="err">Error: ' + err.message + '</span>';
     });
+  }
+
+  Promise.all([libsP, textP]).then(function(results) {
+    var text = results[1];
+    var dir = filename.substring(0, filename.lastIndexOf('/') + 1);
+    buf.innerHTML = renderMarkdown(text, dir);
+
+    // restore scroll position when coming back
+    if (restoreScroll > 0) {
+      buf.scrollTop = restoreScroll;
+      restoreScroll = 0;
+    }
+
+    // ── hover tooltips for short notes ──
+    buf.querySelectorAll('a[href$=".md"]').forEach(function(a) {
+      var href = a.getAttribute('href');
+      var decoded;
+      try { decoded = decodeURIComponent(href); } catch(e) { decoded = href; }
+      if (isShortNote(decoded)) {
+        a.classList.add('note-hover');
+        a.addEventListener('mouseenter', function() { showNoteTooltip(decoded, a); });
+        a.addEventListener('mouseleave', function() { hideNoteTooltip(); });
+      }
+    });
+  }).catch(function(err) {
+    buf.innerHTML = '<span class="err">Error: ' + err.message + '</span>';
+  });
 }
 
 function modalBack() {
