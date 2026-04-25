@@ -492,14 +492,26 @@ function openNote(filename) {
         return r.text();
       })
       .then(function(text) {
-        var lines = text.split('\n');
-        var rawHtml = lines.map(function(l) {
-          var esc = l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-          return '<div class="line"><span class="lc">' + esc + '</span></div>';
-        }).join('');
-        content.innerHTML = rawHtml;
+        // fix image paths: assets/ → notes/assets/
+        var dir = filename.substring(0, filename.lastIndexOf('/') + 1);
+        text = text.replace(/!\[([^\]]*)\]\((assets\/[^)]+)\)/g, '![$1](notes/' + dir + '$2)');
+
+        // render with marked, fallback to raw text
+        try {
+          var html = marked.parse(text, { breaks: true, gfm: true });
+          content.innerHTML = '<div class="note-rendered">' + html + '</div>';
+        } catch(e) {
+          console.error('marked error:', e);
+          // fallback: raw text
+          var lines = text.split('\n');
+          var rawHtml = lines.map(function(l) {
+            var esc = l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            return '<div class="line"><span class="lc">' + esc + '</span></div>';
+          }).join('');
+          content.innerHTML = rawHtml;
+        }
         if (sfEl) sfEl.textContent = filename;
-        console.log('Note loaded, lines:', lines.length);
+        console.log('Note loaded');
       })
       .catch(function(err) {
         console.error('openNote fetch error:', err);
