@@ -1,6 +1,6 @@
 # Stable diffusion历史
 
-> 本文大部分内容参考/摘自 [天才程序员周弈帆](https://zhuanlan.zhihu.com/p/645239262) 的文章，感谢作者的精彩分享。
+> 本文大部分内容参考/摘自 [天才程序员周弈帆](https://zhuanlan.zhihu.com/p/676705162) 的文章，感谢作者的精彩分享。
 
 ### AE (Auto Encoder， 自动编码器)
 
