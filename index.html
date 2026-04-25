@@ -79,9 +79,6 @@ body {
   word-break: break-word;
 }
 
-.tilde .ln { color: var(--blue); }
-.tilde .lc { color: var(--blue); }
-
 /* ── statusline ──────────────────────────────────────── */
 .statusline {
   background: var(--base2);
@@ -133,17 +130,7 @@ body {
 .panel.active { display: block; }
 
 /* ── colors ──────────────────────────────────────────── */
-.h1      { color: var(--yellow); font-weight: bold; }
-.h2      { color: var(--orange); font-weight: bold; }
-.comment { color: var(--base1); }
-.keyword { color: var(--green); }
-.string  { color: var(--cyan); }
-.type    { color: var(--violet); }
-.func    { color: var(--blue); }
 .err     { color: var(--red); }
-.ok      { color: var(--green); }
-.num     { color: var(--magenta); }
-.bold    { font-weight: bold; }
 .dim     { color: var(--base1); }
 
 /* ── rendered note content ────────────────────── */
@@ -189,24 +176,6 @@ a:hover { text-decoration: underline; }
 /* ── skill tags inline ─────────────────────────── */
 .skill-tag {
   color: var(--cyan);
-}
-
-/* ── project items ─────────────────────────────── */
-.proj-name {
-  color: var(--yellow);
-  font-weight: bold;
-}
-
-.proj-desc {
-  color: var(--base0);
-}
-
-.proj-lang {
-  color: var(--magenta);
-}
-
-.proj-stars {
-  color: var(--base1);
 }
 
 /* ── contact links ─────────────────────────────── */
@@ -307,8 +276,6 @@ a:hover { text-decoration: underline; }
   <div class="line"><span class="lc"> </span></div>
   <div class="line"><span class="lc">2026-04  <a href="#" onclick="openNote('sd-history.md');return false">Stable Diffusion 学习笔记</a>  DDPM / VAE / VQGAN / SD</span></div>
   <div class="line"><span class="lc"> </span></div>
-</div>
-  <div class="tilde line"><span class="ln"> 28</span><span class="lc">~</span></div>
 </div>
 
 <!-- ═══ contact ═══ -->
