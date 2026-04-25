@@ -322,6 +322,14 @@ function openNote(filename) {
       });
 
       buf.innerHTML = '<div class="note-rendered">' + html + '</div>';
+
+      // intercept .md links inside modal
+      buf.querySelectorAll('a[href$=".md"]').forEach(function(a) {
+        a.addEventListener('click', function(e) {
+          e.preventDefault();
+          openNote(a.getAttribute('href'));
+        });
+      });
     })
     .catch(function(err) {
       buf.innerHTML = '<span class="err">Error: ' + err.message + '</span>';
