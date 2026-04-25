@@ -4,12 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>kexul · tech</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked@15.0.6/marked.min.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 
@@ -33,7 +27,7 @@
 }
 
 body {
-  font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
   font-size: 14px;
   line-height: 1.8;
   background: var(--base3);
@@ -109,7 +103,7 @@ body {
 .note-rendered {
   padding: 0 1ch;
   line-height: 1.8;
-  font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-size: 14px;
   color: var(--base00);
 }
@@ -239,6 +233,27 @@ a:hover { text-decoration: underline; }
 </div>
 
 <script>
+// ── async library loader (load once, cache) ──
+function loadLib(src, isCSS) {
+  return new Promise(function(resolve, reject) {
+    if (isCSS) {
+      var el = document.querySelector('link[href="' + src + '"]');
+      if (el) return resolve();
+      var link = document.createElement('link');
+      link.rel = 'stylesheet'; link.href = src;
+      link.onload = resolve; link.onerror = reject;
+      document.head.appendChild(link);
+    } else {
+      var el = document.querySelector('script[src="' + src + '"]');
+      if (el) return resolve();
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    }
+  });
+}
+
 // ── modal note viewer ──
 var noteHistory = [];
 var currentNote = '';
@@ -276,7 +291,12 @@ function openNote(filename, noHistory) {
       return r.text();
     })
     .then(function(text) {
-      var dir = filename.substring(0, filename.lastIndexOf('/') + 1);
+      return Promise.all([
+        loadLib('https://cdn.jsdelivr.net/npm/marked@15.0.6/marked.min.js'),
+        loadLib('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css', true),
+        loadLib('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js')
+      ]).then(function() {
+        var dir = filename.substring(0, filename.lastIndexOf('/') + 1);
       text = text.replace(/!\[([^\]]*)\]\((assets\/[^)]+)\)/g, '![$1](notes/' + dir + '$2)');
 
       // protect math
@@ -320,6 +340,7 @@ function openNote(filename, noHistory) {
           e.preventDefault();
           openNote(a.getAttribute('href'));
         });
+      });
       });
     })
     .catch(function(err) {
