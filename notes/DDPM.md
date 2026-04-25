@@ -69,7 +69,7 @@ PE(pos, 2i+1) = cos(\frac{pos}{10000^{2i/d_model}})
 $$
 
 如下图所示
-![image](assets/image-20240715172605-4synska.png)
+![image](assets/image-20240715172605-4synska.webp)
 
 使用了该位置编码之后，pos+k的编码可以用pos的编码线性表示。
 
@@ -78,6 +78,6 @@ PE(pos+k, 2i) = sin(w_i(pos+k)) = sin(w_ipos)cos(w_ik) + cos(w_ipos)sin(w_ik)\\
 PE(pos+k, 2i+1) = cos(w_i(pos+k) = cos(w_ipos)cos(w_ik) - sin(w_ipos)sin(w_ik)
 $$
 
-即![image](assets/image-20240715204904-1emhji1.png)
+即![image](assets/image-20240715204904-1emhji1.webp)
 
 ‍

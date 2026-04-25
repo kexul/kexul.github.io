@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>kexul · tech</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/marked@15.0.6/marked.min.js" as="script">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" as="script">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" as="style">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 
@@ -213,7 +217,7 @@ a.note-hover { color: var(--base00); text-decoration: underline; text-underline-
 <div id="about" class="section">
   <div class="line"><span class="lc"> </span></div>
   <div class="line"><span class="lc">在游戏行业做AIGC的程序员</span></div>
-  <div class="line"><span class="lc"><span class="dim">访问量 <span id="busuanzi_value_site_pv">-</span></span></span></div>
+  <div class="line"><span class="lc"><span class="dim">访问量 <span id="busuanzi_value_site_pv">…</span></span></span></div>
   <div class="line"><span class="lc"> </span></div>
 </div>
 
@@ -225,7 +229,7 @@ a.note-hover { color: var(--base00); text-decoration: underline; text-underline-
 
 </div><!-- /buf -->
 
-<script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+<script defer src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" onerror="document.getElementById('busuanzi_value_site_pv').textContent='-'"></script>
 </div><!-- /vim -->
 
 <div class="modal-overlay" id="modal-overlay">
@@ -437,7 +441,7 @@ function openNote(filename, noHistory) {
   buf.innerHTML = 'loading...';
   overlay.classList.add('open');
 
-  fetch('notes/' + filename + '?z=' + Date.now())
+  fetch('notes/' + filename)
     .then(function(r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.text();
