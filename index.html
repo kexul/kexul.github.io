@@ -278,6 +278,7 @@ setInterval(updateTime, 10000);
 // ── modal note viewer ──
 var noteHistory = [];
 var currentNote = '';
+var restoreScroll = 0;
 
 function openNote(filename, noHistory) {
   var overlay = document.getElementById('modal-overlay');
@@ -286,7 +287,7 @@ function openNote(filename, noHistory) {
 
   // save to history if navigating forward within modal
   if (wasOpen && !noHistory && currentNote && currentNote !== filename) {
-    noteHistory.push(currentNote);
+    noteHistory.push({ filename: currentNote, scrollTop: buf.scrollTop });
   }
 
   currentNote = filename;
@@ -343,6 +344,12 @@ function openNote(filename, noHistory) {
 
       buf.innerHTML = '<div class="note-rendered">' + html + '</div>';
 
+      // restore scroll position when coming back
+      if (restoreScroll > 0) {
+        buf.scrollTop = restoreScroll;
+        restoreScroll = 0;
+      }
+
       // intercept .md links inside modal
       buf.querySelectorAll('a[href$=".md"]').forEach(function(a) {
         a.addEventListener('click', function(e) {
@@ -359,7 +366,8 @@ function openNote(filename, noHistory) {
 function modalBack() {
   var prev = noteHistory.pop();
   if (prev) {
-    openNote(prev, true);
+    restoreScroll = prev.scrollTop;
+    openNote(prev.filename, true);
   } else {
     closeModal();
   }
@@ -369,6 +377,7 @@ function closeModal() {
   document.getElementById('modal-overlay').classList.remove('open');
   noteHistory = [];
   currentNote = '';
+  restoreScroll = 0;
 }
 
 // click overlay to close
