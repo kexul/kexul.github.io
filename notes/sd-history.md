@@ -48,7 +48,7 @@ VQGAN在VQVAE的基础上用[感知误差](感知误差.md)替换了重建误差
 
 DDPM + VQGAN:先用DDPM生成64x64的小图,再用VAE或者VQVAE的Decoder放大8倍(因为DDPM得到的是连续向量,所以用VAE也可以,两种都能取得不错的效果),生成512x512的图。
 
-#### [Stable Diffusion 结构](Stable diffusion结构.md)
+#### [Stable Diffusion 结构](sd-structure.md)
 
 UNet 结构细节、Cross Attention 机制、残差卷积层设计。
 
