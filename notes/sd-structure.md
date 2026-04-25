@@ -2,16 +2,21 @@
 
 ## [整体架构](https://zhuanlan.zhihu.com/p/613337342)
 
-![整体架构](assets/v2-60b029fe6065252a1441ecc5a3f6bb1a_r-20240425163115-yc774lt.jpg)
+![v2-60b029fe6065252a1441ecc5a3f6bb1a_r](assets/v2-60b029fe6065252a1441ecc5a3f6bb1a_r-20240425163115-yc774lt.jpg)
 
-### [UNet 结构](unet-structure.md)
+### 使用UNet做DDPM
 
-从原始 UNet 到 DDPM UNet 再到 Stable Diffusion UNet 的演进：下采样提取特征、上采样恢复分辨率、跳连传递细节。
+- [原始UNet结构](unet-structure.md)
 
-### [Cross Attention](cross-attention.md)
+![image](assets/image-20240425160939-nkrjj6l.png)
 
-文本条件注入图像生成的关键机制。DDPM 中只在深层加入，Stable Diffusion 中每一层都有，控制更精细。
+- DDPM中的UNet结构
 
-### [残差卷积](residual-conv.md)
+  - 普通卷积替换成带[残差卷积](residual-conv.md)，比较深的层还有[cross attention](cross-attention.md)加持
+  - 更加密集的原始信息：每个大层的下采样部分的每个子模块都会输入到对称的上采样部分
 
-普通卷积替换为带残差连接的卷积块，训练更稳定、网络可以更深，时间步嵌入也由此注入。
+![image](assets/image-20240425161106-ik3p00p.png)
+
+- [Stable diffusion中的UNet结构](unet-structure.md)，每一层都有[cross attention](cross-attention.md)加持
+
+![image](assets/image-20240425161511-ur0qy3d.png)
