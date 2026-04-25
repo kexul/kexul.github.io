@@ -44,7 +44,9 @@ VQGAN在VQVAE的基础上用[感知误差](感知误差.md)替换了重建误差
 
 ![image](assets/image-20240425144722-v21nvqk.png)
 
-### [Stable Diffusion](sd-structure.md)
+### Stable Diffusion
+
+→ [结构详解](sd-structure.md)
 
 DDPM + VQGAN 的组合：先用 DDPM 生成 64×64 小图，再用 VAE/VQVAE 的 Decoder 放大 8 倍到 512×512。
 
