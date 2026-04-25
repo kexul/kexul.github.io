@@ -117,8 +117,6 @@ body {
 .section:last-of-type { border-bottom: none; }
 
 /* ── note viewer ── */
-.note-viewer { display: none; padding: 16px 0; }
-.note-viewer.active { display: block; }
 
 /* ── colors ──────────────────────────────────────────── */
 .err     { color: var(--red); }
@@ -201,18 +199,11 @@ a:hover { text-decoration: underline; }
   <div class="line"><span class="lc"> </span></div>
 </div>
 
-<!-- ═══ projects ═══ -->
-<!-- ═══ note viewer ═══ -->
-<div id="note-viewer" class="note-viewer">
-  <div class="line"><span class="lc">notes/ <span id="note-filename"></span>  <a href="#" onclick="backToBlog();return false" style="color:var(--blue)">[x]</a></span></div>
-  <div id="note-content"></div>
-</div>
-
 </div><!-- /buf -->
 
 <!-- ── STATUSLINE ── -->
 <div class="statusline">
-  <span><a href="https://github.com/kexul/kexul.github.io">kexul.github.io</a> <span id="status-filename" class="dim"></span></span>
+  <span><a href="https://github.com/kexul/kexul.github.io">kexul.github.io</a></span>
   <span>tech notes <span id="status-time"></span></span>
 </div>
 
@@ -221,89 +212,83 @@ a:hover { text-decoration: underline; }
 <script>
 // ── clock in statusline ──
 function updateTime() {
-  const now = new Date();
-  const t = now.toTimeString().slice(0,5);
+  var now = new Date();
+  var t = now.toTimeString().slice(0,5);
   document.getElementById('status-time').textContent = t;
 }
 updateTime();
 setInterval(updateTime, 10000);
 
-// ── note viewer ──
-
-// Store openNote errors for debugging
-window.__noteErrors = [];
+// ── full-page note switch ──
+var savedMain = null;
 
 function openNote(filename) {
-  try {
-    console.log('openNote called with:', filename);
-    const viewer = document.getElementById('note-viewer');
-    const content = document.getElementById('note-content');
-    const fnEl = document.getElementById('note-filename');
-    const sfEl = document.getElementById('status-filename');
+  // save main page HTML (first time only)
+  if (!savedMain) {
+    savedMain = document.querySelector('.vim').innerHTML;
+  }
 
-    if (!viewer || !content || !fnEl) {
-      console.error('Missing elements:', {viewer:!!viewer, content:!!content, fnEl:!!fnEl});
-      return;
-    }
+  var vim = document.querySelector('.vim');
+  vim.innerHTML = '';
 
-    fnEl.textContent = filename;
+  var buf = document.createElement('div');
+  buf.style.padding = '32px 24px';
+  buf.style.flex = '1';
+  buf.innerHTML = '<div style="margin-bottom:24px"><a href="#" onclick="backToMain();return false" style="color:var(--base1);font-size:14px">\u2190 back</a> <span style="color:var(--base1);font-size:14px">' + filename + '</span></div><div id="note-body">loading...</div>';
+  vim.appendChild(buf);
 
-    viewer.classList.add('active');
+  fetch('notes/' + filename)
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    })
+    .then(function(text) {
+      var dir = filename.substring(0, filename.lastIndexOf('/') + 1);
+      text = text.replace(/!\[([^\]]*)\]\((assets\/[^)]+)\)/g, '![$1](notes/' + dir + '$2)');
 
-    content.innerHTML = '<div class="line"><span class="lc">loading...</span></div>';
-
-    var url = 'notes/' + filename;
-    console.log('Fetching:', url);
-    fetch(url)
-      .then(function(r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.text();
-      })
-      .then(function(text) {
-        // fix image paths: assets/ → notes/assets/
-        var dir = filename.substring(0, filename.lastIndexOf('/') + 1);
-        text = text.replace(/!\[([^\]]*)\]\((assets\/[^)]+)\)/g, '![$1](notes/' + dir + '$2)');
-
-        // render with marked, fallback to raw text
-        try {
-          var html = marked.parse(text, { breaks: true, gfm: true });
-          content.innerHTML = '<div class="note-rendered" id="note-rendered">' + html + '</div>';
-          // make links to .md files open via openNote
-          document.getElementById('note-rendered').addEventListener('click', function(e) {
-            var link = e.target.closest('a');
-            if (link && link.getAttribute('href').endsWith('.md')) {
-              e.preventDefault();
-              openNote(link.getAttribute('href'));
-            }
-          });
-        } catch(e) {
-          console.error('marked error:', e);
-          // fallback: raw text
-          var lines = text.split('\n');
-          var rawHtml = lines.map(function(l) {
-            var esc = l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            return '<div class="line"><span class="lc">' + esc + '</span></div>';
-          }).join('');
-          content.innerHTML = rawHtml;
-        }
-        if (sfEl) sfEl.textContent = filename;
-        console.log('Note loaded');
-      })
-      .catch(function(err) {
-        console.error('openNote fetch error:', err);
-        content.innerHTML = '<div class="line"><span class="lc"><span class="err">Error: ' + err.message + '</span></span></div>';
+      // protect math
+      var mathBlocks = [], mathInlines = [];
+      text = text.replace(/\$\$([\s\S]*?)\$\$/g, function(m) {
+        var id = mathBlocks.length;
+        mathBlocks.push(m.slice(2, -2));
+        return '==BLOCKMATH' + id + '==';
       });
-  } catch(e) {
-    console.error('openNote sync error:', e);
+      text = text.replace(/\$([^$]+?)\$/g, function(m) {
+        var inner = m.slice(1, -1).trim();
+        if (!inner) return m;
+        var id = mathInlines.length;
+        mathInlines.push(inner);
+        return '==INLINEMATH' + id + '==';
+      });
+
+      var html = marked.parse(text, { breaks: true, gfm: true });
+
+      // restore math
+      html = html.replace(/==BLOCKMATH(\d+)==/g, function(_, id) {
+        try { return katex.renderToString(mathBlocks[parseInt(id)], { displayMode: true, throwOnError: false }); }
+        catch(e) { return mathBlocks[parseInt(id)]; }
+      });
+      html = html.replace(/==INLINEMATH(\d+)==/g, function(_, id) {
+        try { return katex.renderToString(mathInlines[parseInt(id)], { displayMode: false, throwOnError: false }); }
+        catch(e) { return mathInlines[parseInt(id)]; }
+      });
+
+      document.getElementById('note-body').innerHTML = '<div class="note-rendered">' + html + '</div>';
+    })
+    .catch(function(err) {
+      document.getElementById('note-body').innerHTML = '<span class="err">Error: ' + err.message + '</span>';
+    });
+}
+
+function backToMain() {
+  if (savedMain) {
+    document.querySelector('.vim').innerHTML = savedMain;
+    savedMain = null;
   }
 }
-
-function backToBlog() {
-  document.getElementById('note-viewer').classList.remove('active');
-  document.getElementById('status-filename').textContent = '';
-  document.getElementById('note-filename').textContent = '';
-  window.scrollTo({ top: document.getElementById('blog').offsetTop - 20, behavior: 'smooth' });
-}
+</script>
+</body>
+</html>
 </script>
 </body>
 </html>
