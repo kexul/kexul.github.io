@@ -6,7 +6,7 @@
 ## Tasks
 
 ### 1. Tab 标签去冒号
-- [ ] `:about` → `about`, `:skills` → `skills`, `:projects` → `projects`, `:blog` → `blog`, `:contact` → `contact`
+- [x] `:about` → `about`, `:skills` → `skills`, `:projects` → `projects`, `:blog` → `blog`, `:contact` → `contact`
 
 ### 2. 重写 about 面板
 - [ ] 去掉 `me = { ... }` 代码块风格，改用纯文字
