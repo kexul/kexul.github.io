@@ -1,43 +1,43 @@
 # TODO
 
 ## Goal
-精简个人主页，去掉所有 Vim 模拟装饰符号（`"--` 注释头、`:echo` 命令、`~` 空行标记、`:about` 冒号等），保留 Solarized 配色、Tab 切换和笔记阅读功能，内容更干净简洁。
+将页面从 Tab 切换改为单页滚动布局，板块顺序：about → skills → blog → projects → contact，保留笔记阅读功能和底部 statusline。
 
 ## Tasks
 
-### 1. Tab 标签去冒号
-- [x] `:about` → `about`, `:skills` → `skills`, `:projects` → `projects`, `:blog` → `blog`, `:contact` → `contact`
+### 1. 重构 HTML 结构：去掉 Tab 系统，改为上下排列的板块
+- [ ] 删除 `.tabline` 整个元素
+- [ ] 删除所有 `.panel` 包裹层，每个板块变成独立 `<section>` 或 `<div>`
+- [ ] 删除 JS 中的 Tab 切换逻辑
+- [ ] 删除 CSS 中 `.panel`、`.tabline` 相关样式
 
-### 2. 重写 about 面板
-- [x] 去掉 `me = { ... }` 代码块风格，改用纯文字
-- [x] 去掉 `"-- about me ---"`、`"-- highlights ---"`、`"-- quick links ---"` 这类注释装饰
-- [x] 去掉 `:help me build cool stuff` 和 `~` 空行
+### 2. 更新 CSS 为单页滚动布局
+- [ ] 移除 `.vim` 的 max-width / border / flex 限制（改为全宽或留白适中的单栏）
+- [ ] 各板块之间用间距或分割线分隔
+- [ ] 适配移动端
 
-### 3. 重写 skills 面板
-- [x] 去掉 `"-- Languages ---"` 等注释头
-- [x] 去掉 `:echo "always learning new things"` 和 `~` 空行
-- [x] 语言条目去掉进度条符号，保持简洁
+### 3. 按顺序重写各板块内容
+- [ ] about 板块（保持现有纯文字内容）
+- [ ] skills 板块（保持现有内容）
+- [ ] blog 板块（保持现有笔记链接，保留 openNote 功能）
+- [ ] projects 板块（保持现有项目列表）
+- [ ] contact 板块（保持现有联系链接）
 
-### 4. 重写 projects 面板
-- [x] 去掉 `"-- pi coding agent ecosystem ---"` 等分类注释头
-- [x] 去掉 `:echo "all repos → ..."` 和 `~` 空行
-- [x] 项目条目保持纯文字 + 链接
+### 4. 保留底部 statusline
+- [ ] 保留 `.statusline`，样式不变
+- [ ] 保留时钟功能
+- [ ] 保留文件名显示（当查看笔记时）
 
-### 5. 重写 blog 面板
-- [x] 去掉 `"--` 注释头
-- [x] 去掉 `:echo "stay tuned..."` 和 `~` 空行
+### 5. 保留笔记阅读功能
+- [ ] 笔记阅读视口保持不变
+- [ ] `openNote` / `backToBlog` 函数适配单页模式
+- [ ] 阅读笔记时滚动到笔记区域或覆盖显示
 
-### 6. 重写 contact 面板
-- [x] 去掉 `"-- reach me at ---"` 注释头
-- [x] 去掉 `:echo "feel free to reach out!"` 和 `~` 空行
-
-### 7. 重写 note-viewer 面板
-- [x] 笔记标题栏去掉 `" notes/` 注释风格
-
-### 8. 精简 CSS 中不再需要的样式类
-- [x] 移除 `.tilde`、`.h1`、`.h2` 等不再使用的样式
+### 6. 清理不再需要的 JS 和 CSS
+- [ ] 移除 Tab 切换相关 JS
+- [ ] 移除 `.panel`、`.tabline`、`.ln` 等不再使用的 CSS
 
 ## Notes
-- 整体 Solarized 配色、Tab 栏、状态栏、底部 statusline 保持不变
-- 笔记阅读功能（openNote、backToBlog）保持不变
-- 每完成一个面板就推送一次，方便验证效果
+- 板块内容保持上次精简后的干净文本风格
+- 笔记功能（marked + image rendering + click interceptor）不变
+- 状态栏（statusline）保留不动

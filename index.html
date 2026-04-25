@@ -35,18 +35,17 @@
 body {
   font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', sans-serif;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.8;
   background: var(--base3);
   color: var(--base00);
   min-height: 100vh;
 }
 
-/* ── vim chrome ──────────────────────────────────────── */
+/* ── layout ──────────────────────────────────────── */
 .vim {
-  max-width: 820px;
+  max-width: 720px;
   margin: 0 auto;
-  border-left: 1px solid var(--base2);
-  border-right: 1px solid var(--base2);
+  padding: 32px 24px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -54,22 +53,10 @@ body {
 
 .buf {
   flex: 1;
-  padding: 0;
 }
 
 .line {
-  display: flex;
   min-height: 1.6em;
-}
-
-.ln {
-  width: 4ch;
-  text-align: right;
-  padding-right: 1ch;
-  color: var(--base1);
-  user-select: none;
-  flex-shrink: 0;
-  display: none;
 }
 
 .lc {
@@ -126,8 +113,12 @@ body {
   font-weight: bold;
 }
 
-.panel { display: none; }
-.panel.active { display: block; }
+.section { display: block; padding: 16px 0; border-bottom: 1px solid var(--line-light); }
+.section:last-of-type { border-bottom: none; }
+
+/* ── note viewer ── */
+.note-viewer { display: none; padding: 16px 0; }
+.note-viewer.active { display: block; }
 
 /* ── colors ──────────────────────────────────────────── */
 .err     { color: var(--red); }
@@ -178,21 +169,6 @@ a:hover { text-decoration: underline; }
   color: var(--cyan);
 }
 
-/* ── contact links ─────────────────────────────── */
-.contact-list {
-  display: block;
-}
-
-/* ── Cursor blink for the tag line ─────────────── */
-@keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
-.cursor {
-  display: inline-block;
-  width: 8px;
-  height: 1.1em;
-  background: var(--base00);
-  vertical-align: text-bottom;
-  animation: blink 1s step-end infinite;
-}
 
 /* ── small screens ─────────────────────────────── */
 @media (max-width: 640px) {
@@ -204,20 +180,11 @@ a:hover { text-decoration: underline; }
 <body>
 <div class="vim">
 
-<!-- ── TABLINE ── -->
-<div class="tabline">
-  <button class="active" data-panel="about">about</button>
-  <button data-panel="skills">skills</button>
-  <button data-panel="projects">projects</button>
-  <button data-panel="blog">blog</button>
-  <button data-panel="contact">contact</button>
-</div>
-
 <!-- ── BUFFER ── -->
 <div class="buf">
 
 <!-- ═══ about ═══ -->
-<div id="about" class="panel active">
+<div id="about" class="section">
   <div class="line"><span class="lc"> </span></div>
   <div class="line"><span class="lc">Hi there 👋, 游戏行业搬砖中。</span></div>
   <div class="line"><span class="lc"> </span></div>
@@ -230,7 +197,7 @@ a:hover { text-decoration: underline; }
 </div>
 
 <!-- ═══ skills ═══ -->
-<div id="skills" class="panel">
+<div id="skills" class="section">
   <div class="line"><span class="lc">Python         ·  main tool</span></div>
   <div class="line"><span class="lc">C++            ·  game dev</span></div>
   <div class="line"><span class="lc">Shell          ·  automation</span></div>
@@ -241,8 +208,15 @@ a:hover { text-decoration: underline; }
   <div class="line"><span class="lc"> </span></div>
 </div>
 
+<!-- ═══ blog ═══ -->
+<div id="blog" class="section">
+  <div class="line"><span class="lc"> </span></div>
+  <div class="line"><span class="lc">2026-04  <a href="#" onclick="openNote('sd-history.md');return false">Stable Diffusion 学习笔记</a>  DDPM / VAE / VQGAN / SD</span></div>
+  <div class="line"><span class="lc"> </span></div>
+</div>
+
 <!-- ═══ projects ═══ -->
-<div id="projects" class="panel">
+<div id="projects" class="section">
   <div class="line"><span class="lc"><a href="https://github.com/kexul/pi-everything-search" target="_blank">pi-everything-search</a>  [TypeScript]</span></div>
   <div class="line"><span class="lc">  Windows Everything 搜索引擎扩展，毫秒级文件搜索。🚀</span></div>
   <div class="line"><span class="lc"> </span></div>
@@ -271,15 +245,8 @@ a:hover { text-decoration: underline; }
   <div class="line"><span class="lc"> </span></div>
 </div>
 
-<!-- ═══ blog ═══ -->
-<div id="blog" class="panel">
-  <div class="line"><span class="lc"> </span></div>
-  <div class="line"><span class="lc">2026-04  <a href="#" onclick="openNote('sd-history.md');return false">Stable Diffusion 学习笔记</a>  DDPM / VAE / VQGAN / SD</span></div>
-  <div class="line"><span class="lc"> </span></div>
-</div>
-
 <!-- ═══ contact ═══ -->
-<div id="contact" class="panel">
+<div id="contact" class="section">
   <div class="line"><span class="lc"> </span></div>
   <div class="line"><span class="lc"><a href="https://github.com/kexul" target="_blank">GitHub</a>       github.com/kexul</span></div>
   <div class="line"><span class="lc"><a href="https://huggingface.co/kexul" target="_blank">Hugging Face</a>  huggingface.co/kexul</span></div>
@@ -289,7 +256,7 @@ a:hover { text-decoration: underline; }
 </div>
 
 <!-- ═══ note viewer ═══ -->
-<div id="note-viewer" class="panel">
+<div id="note-viewer" class="note-viewer">
   <div class="line"><span class="lc">notes/ <span id="note-filename"></span>  <a href="#" onclick="backToBlog();return false" style="color:var(--blue)">[x]</a></span></div>
   <div id="note-content"></div>
 </div>
@@ -305,22 +272,6 @@ a:hover { text-decoration: underline; }
 </div><!-- /vim -->
 
 <script>
-// ── tab switching ──
-const buttons = document.querySelectorAll('.tabline button');
-const panels = {};
-
-buttons.forEach(btn => {
-  const id = btn.dataset.panel;
-  panels[id] = document.getElementById(id);
-  btn.addEventListener('click', function() {
-    buttons.forEach(function(b) { b.classList.remove('active'); });
-    Object.values(panels).forEach(function(p) { p.classList.remove('active'); });
-    document.getElementById('note-viewer').classList.remove('active');
-    btn.classList.add('active');
-    panels[id].classList.add('active');
-  });
-});
-
 // ── clock in statusline ──
 function updateTime() {
   const now = new Date();
@@ -350,8 +301,6 @@ function openNote(filename) {
 
     fnEl.textContent = filename;
 
-    document.querySelectorAll('.tabline button').forEach(function(b) { b.classList.remove('active'); });
-    Object.values(panels).forEach(function(p) { p.classList.remove('active'); });
     viewer.classList.add('active');
 
     content.innerHTML = '<div class="line"><span class="lc">loading...</span></div>';
@@ -403,12 +352,10 @@ function openNote(filename) {
 }
 
 function backToBlog() {
-  document.querySelectorAll('.tabline button').forEach(b => b.classList.remove('active'));
-  Object.values(panels).forEach(p => p.classList.remove('active'));
-  document.querySelector('.tabline button[data-panel="blog"]').classList.add('active');
-  document.getElementById('blog').classList.add('active');
+  document.getElementById('note-viewer').classList.remove('active');
   document.getElementById('status-filename').textContent = '';
   document.getElementById('note-filename').textContent = '';
+  window.scrollTo({ top: document.getElementById('blog').offsetTop - 20, behavior: 'smooth' });
 }
 </script>
 </body>
