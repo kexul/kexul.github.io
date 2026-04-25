@@ -356,7 +356,7 @@ function openNote(filename) {
 
     content.innerHTML = '<div class="line"><span class="lc">loading...</span></div>';
 
-    var url = 'notes/' + filename.split('/').map(function(s) { return encodeURIComponent(s); }).join('/');
+    var url = 'notes/' + filename;
     console.log('Fetching:', url);
     fetch(url)
       .then(function(r) {
