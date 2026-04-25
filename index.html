@@ -441,9 +441,10 @@ const panels = {};
 buttons.forEach(btn => {
   const id = btn.dataset.panel;
   panels[id] = document.getElementById(id);
-  btn.addEventListener('click', () => {
-    buttons.forEach(b => b.classList.remove('active'));
-    Object.values(panels).forEach(p => p.classList.remove('active'));
+  btn.addEventListener('click', function() {
+    buttons.forEach(function(b) { b.classList.remove('active'); });
+    Object.values(panels).forEach(function(p) { p.classList.remove('active'); });
+    document.getElementById('note-viewer').classList.remove('active');
     btn.classList.add('active');
     panels[id].classList.add('active');
   });
