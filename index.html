@@ -153,20 +153,64 @@ body {
 a { color: var(--blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-/* ── cards / sections inside vim lines ──────────── */
-.section-block {
-  display: block;
+/* ── modal ───────────────────────────────────────────── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,43,54,0.35);
+  z-index: 100;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2em 1em;
+  overflow-y: auto;
+}
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--base3);
+  border: 1px solid var(--base1);
+  max-width: 760px;
+  width: 100%;
 }
 
-.section-block .lc {
-  padding-bottom: 0.3em;
+.modal-tabline {
+  background: var(--base2);
+  border-bottom: 1px solid var(--base1);
+  display: flex;
+  justify-content: space-between;
+  padding: 0 1ch;
+  line-height: 1.8;
 }
 
-/* ── skill tags inline ─────────────────────────── */
-.skill-tag {
-  color: var(--cyan);
+.modal-title { color: var(--base00); font-weight: bold; }
+
+.modal-close {
+  font-family: inherit;
+  background: none;
+  border: none;
+  color: var(--base01);
+  cursor: pointer;
+  font-size: inherit;
+}
+.modal-close:hover { color: var(--red); }
+
+.modal-buf {
+  padding: 1ch;
+  max-height: 70vh;
+  overflow-y: auto;
+  line-height: 1.8;
+  font-size: 14px;
 }
 
+.modal-status {
+  background: var(--base2);
+  border-top: 1px solid var(--base1);
+  padding: 0 1ch;
+  line-height: 1.8;
+  color: var(--base01);
+  font-size: 13px;
+}
 
 /* ── small screens ─────────────────────────────── */
 @media (max-width: 640px) {
@@ -209,6 +253,18 @@ a:hover { text-decoration: underline; }
 
 </div><!-- /vim -->
 
+<!-- ── MODAL ── -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal">
+    <div class="modal-tabline">
+      <span class="modal-title" id="modal-title">notes/</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-buf" id="modal-buf">loading...</div>
+    <div class="modal-status"><span id="modal-filename"></span></div>
+  </div>
+</div>
+
 <script>
 // ── clock in statusline ──
 function updateTime() {
@@ -219,23 +275,15 @@ function updateTime() {
 updateTime();
 setInterval(updateTime, 10000);
 
-// ── full-page note switch ──
-var savedMain = null;
-
+// ── modal note viewer ──
 function openNote(filename) {
-  // save main page HTML (first time only)
-  if (!savedMain) {
-    savedMain = document.querySelector('.vim').innerHTML;
-  }
+  var overlay = document.getElementById('modal-overlay');
+  var buf = document.getElementById('modal-buf');
+  document.getElementById('modal-title').textContent = 'notes/' + filename;
+  document.getElementById('modal-filename').textContent = filename;
 
-  var vim = document.querySelector('.vim');
-  vim.innerHTML = '';
-
-  var buf = document.createElement('div');
-  buf.style.padding = '32px 24px';
-  buf.style.flex = '1';
-  buf.innerHTML = '<div style="margin-bottom:24px"><a href="#" onclick="backToMain();return false" style="color:var(--base1);font-size:14px">\u2190 back</a> <span style="color:var(--base1);font-size:14px">' + filename + '</span></div><div id="note-body">loading...</div>';
-  vim.appendChild(buf);
+  buf.innerHTML = 'loading...';
+  overlay.classList.add('open');
 
   fetch('notes/' + filename)
     .then(function(r) {
@@ -273,19 +321,21 @@ function openNote(filename) {
         catch(e) { return mathInlines[parseInt(id)]; }
       });
 
-      document.getElementById('note-body').innerHTML = '<div class="note-rendered">' + html + '</div>';
+      buf.innerHTML = '<div class="note-rendered">' + html + '</div>';
     })
     .catch(function(err) {
-      document.getElementById('note-body').innerHTML = '<span class="err">Error: ' + err.message + '</span>';
+      buf.innerHTML = '<span class="err">Error: ' + err.message + '</span>';
     });
 }
 
-function backToMain() {
-  if (savedMain) {
-    document.querySelector('.vim').innerHTML = savedMain;
-    savedMain = null;
-  }
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
 }
+
+// click overlay to close
+document.getElementById('modal-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
 </script>
 </body>
 </html>
