@@ -257,7 +257,7 @@ a:hover { text-decoration: underline; }
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal" id="modal">
     <div class="modal-tabline">
-      <span><button id="modal-back" class="modal-close" onclick="modalBack()"></span><span class="modal-title" id="modal-title">notes/</span>
+      <span><button id="modal-back" class="modal-close" onclick="modalBack()"></button><span class="modal-title" id="modal-title">notes/</span></span>
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-buf" id="modal-buf">loading...</div>
@@ -279,18 +279,25 @@ setInterval(updateTime, 10000);
 var noteHistory = [];
 var currentNote = '';
 
-function openNote(filename) {
+function openNote(filename, noHistory) {
   var overlay = document.getElementById('modal-overlay');
   var buf = document.getElementById('modal-buf');
   var wasOpen = overlay.classList.contains('open');
 
-  // save to history if navigating from within modal
-  if (wasOpen && currentNote && currentNote !== filename) {
+  // save to history if navigating forward within modal
+  if (wasOpen && !noHistory && currentNote && currentNote !== filename) {
     noteHistory.push(currentNote);
   }
 
   currentNote = filename;
-  updateModalBack();
+
+  var backBtn = document.getElementById('modal-back');
+  if (noteHistory.length > 0) {
+    backBtn.textContent = '\u2190';
+    backBtn.style.visibility = 'visible';
+  } else {
+    backBtn.style.visibility = 'hidden';
+  }
 
   document.getElementById('modal-title').textContent = 'notes/' + filename;
   document.getElementById('modal-filename').textContent = filename;
@@ -349,21 +356,10 @@ function openNote(filename) {
     });
 }
 
-function updateModalBack() {
-  var btn = document.getElementById('modal-back');
-  if (noteHistory.length > 0) {
-    btn.textContent = '\u2190 ';
-    btn.style.visibility = 'visible';
-  } else {
-    btn.style.visibility = 'hidden';
-  }
-}
-
 function modalBack() {
   var prev = noteHistory.pop();
   if (prev) {
-    currentNote = prev;
-    openNote(prev);
+    openNote(prev, true);
   } else {
     closeModal();
   }
