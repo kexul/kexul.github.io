@@ -145,62 +145,57 @@ a { color: var(--blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
 a.note-hover { color: var(--base00); text-decoration: underline; text-underline-offset: 2px; cursor: default; }
 
-.modal-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,43,54,0.35);
-  z-index: 100;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 2em 1em;
-  overflow-y: auto;
-}
-.modal-overlay.open { display: flex; }
-
-.modal {
-  background: var(--base3);
-  border: 1px solid var(--base1);
-  max-width: 760px;
-  width: 100%;
-}
-
-.modal-tabline {
+.note-view { display: none; }
+.note-header {
   background: var(--base2);
   border-bottom: 1px solid var(--base1);
   display: flex;
-  justify-content: space-between;
+  align-items: center;
   padding: 0 1ch;
   line-height: 1.8;
+  margin-bottom: 1em;
 }
-
-.modal-title { color: var(--base00); font-weight: bold; margin-left: 0.5ch; }
-
-.modal-close {
+.note-header button {
   font-family: inherit;
   background: none;
   border: none;
   color: var(--base01);
   cursor: pointer;
   font-size: inherit;
+  padding: 0 1ch 0 0;
 }
-.modal-close:hover { color: var(--red); }
+.note-header button:hover { color: var(--blue); }
+.note-header .note-title { color: var(--base00); font-weight: bold; margin-left: 0.5ch; }
 
-.modal-buf {
-  padding: 1ch;
-  max-height: 70vh;
-  overflow-y: auto;
-  line-height: 1.8;
-  font-size: 14px;
-}
-
-.modal-status {
-  background: var(--base2);
+.demo-player {
+  display: none;
   border-top: 1px solid var(--base1);
+  margin-top: 1em;
+}
+.demo-player.active { display: block; }
+.demo-player-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--base2);
   padding: 0 1ch;
-  line-height: 1.8;
+  line-height: 2;
+}
+.demo-player-bar span { color: var(--base01); font-size: 13px; }
+.demo-player-bar button {
+  font-family: inherit;
+  background: none;
+  border: none;
   color: var(--base01);
+  cursor: pointer;
   font-size: 13px;
+}
+.demo-player-bar button:hover { color: var(--red); }
+.demo-player iframe {
+  width: 100%;
+  height: 400px;
+  border: none;
+  display: block;
 }
 
 @media (max-width: 640px) {
@@ -213,6 +208,7 @@ a.note-hover { color: var(--base00); text-decoration: underline; text-underline-
 
 <div class="buf">
 
+<div id="note-list">
 <div id="about" class="section">
   <div class="line"><span class="lc"> </span></div>
   <div class="line"><span class="lc">在游戏行业做AIGC的程序员</span></div>
@@ -221,24 +217,30 @@ a.note-hover { color: var(--base00); text-decoration: underline; text-underline-
 
 <div id="blog" class="section">
   <div class="line"><span class="lc"> </span></div>
+  <div class="line"><span class="lc">2025-04  <a href="notes/llm-canvas-test.md" onclick="openNote('llm-canvas-test.md');return false">大模型前端代码生成横评</a>  7 模型 × Canvas 2D 深海动画</span></div>
   <div class="line"><span class="lc">2025-04  <a href="notes/sd-history.md" onclick="openNote('sd-history.md');return false">Stable Diffusion 学习笔记</a>  DDPM / VAE / VQGAN / UNet / SD</span></div>
   <div class="line"><span class="lc"> </span></div>
+</div>
+</div>
+
+<div id="note-view" class="note-view">
+  <div class="note-header">
+    <button onclick="showNoteList()">←</button>
+    <span class="note-title" id="note-filename">notes/</span>
+  </div>
+  <div id="note-content"></div>
+  <div id="demo-player" class="demo-player">
+    <div class="demo-player-bar">
+      <span id="demo-label"></span>
+      <button onclick="closeDemoPlayer()">✕</button>
+    </div>
+    <div id="demo-frame"></div>
+  </div>
 </div>
 
 </div><!-- /buf -->
 
 </div><!-- /vim -->
-
-<div class="modal-overlay" id="modal-overlay">
-  <div class="modal" id="modal">
-    <div class="modal-tabline">
-      <span><button id="modal-back" class="modal-close" onclick="modalBack()"></button><span class="modal-title" id="modal-title">notes/</span></span>
-      <button class="modal-close" onclick="closeModal()">✕</button>
-    </div>
-    <div class="modal-buf" id="modal-buf">loading...</div>
-    <div class="modal-status"><span id="modal-filename"></span></div>
-  </div>
-</div>
 
 <div class="note-tooltip" id="note-tooltip"></div>
 
@@ -415,39 +417,8 @@ function hideNoteTooltip() {
   }
 })();
 
-// ── modal note viewer ──
-var noteHistory = [];
-var currentNote = '';
-var restoreScroll = 0;
-
-function openNote(filename, noHistory) {
-  var overlay = document.getElementById('modal-overlay');
-  var buf = document.getElementById('modal-buf');
-  var wasOpen = overlay.classList.contains('open');
-
-  // save to history if navigating forward within modal
-  if (wasOpen && !noHistory && currentNote && currentNote !== filename) {
-    noteHistory.push({ filename: currentNote, scrollTop: buf.scrollTop });
-  }
-
-  currentNote = filename;
-
-  var backBtn = document.getElementById('modal-back');
-  if (noteHistory.length > 0) {
-    backBtn.textContent = '\u2190';
-    backBtn.style.visibility = 'visible';
-  } else {
-    backBtn.style.visibility = 'hidden';
-  }
-
-  document.getElementById('modal-title').textContent = 'notes/' + filename;
-  document.getElementById('modal-filename').textContent = filename;
-
-  buf.innerHTML = 'loading...';
-  overlay.classList.add('open');
-
-  // Start libs loading and note fetching in parallel
-  var libsP = ensureLibs();
+// ── inline note viewer ──
+function openNote(filename) {
   var textP;
   if (filename === 'sd-history.md' && window._prefetchedSdHistory) {
     textP = Promise.resolve(window._prefetchedSdHistory);
@@ -459,19 +430,19 @@ function openNote(filename, noHistory) {
     });
   }
 
-  Promise.all([libsP, textP]).then(function(results) {
+  Promise.all([ensureLibs(), textP]).then(function(results) {
     var text = results[1];
     var dir = filename.substring(0, filename.lastIndexOf('/') + 1);
-    buf.innerHTML = renderMarkdown(text, dir);
+    var html = renderMarkdown(text, dir);
 
-    // restore scroll position when coming back
-    if (restoreScroll > 0) {
-      buf.scrollTop = restoreScroll;
-      restoreScroll = 0;
-    }
+    document.getElementById('note-list').style.display = 'none';
+    document.getElementById('note-view').style.display = 'block';
+    document.getElementById('note-filename').textContent = 'notes/' + filename;
+    document.getElementById('note-content').innerHTML = html;
+    window.scrollTo(0, 0);
 
     // ── hover tooltips for short notes ──
-    buf.querySelectorAll('a[href$=".md"]').forEach(function(a) {
+    document.getElementById('note-content').querySelectorAll('a[href$=".md"]').forEach(function(a) {
       var href = a.getAttribute('href');
       var decoded;
       try { decoded = decodeURIComponent(href); } catch(e) { decoded = href; }
@@ -481,35 +452,33 @@ function openNote(filename, noHistory) {
         a.addEventListener('mouseleave', function() { hideNoteTooltip(); });
       }
     });
+
+    // ensure demo-player is hidden on new note load
+    closeDemoPlayer();
   }).catch(function(err) {
-    buf.innerHTML = '<span class="err">Error: ' + err.message + '</span>';
+    document.getElementById('note-list').style.display = 'none';
+    document.getElementById('note-view').style.display = 'block';
+    document.getElementById('note-content').innerHTML = '<span class="err">Error: ' + err.message + '</span>';
   });
 }
 
-function modalBack() {
-  var prev = noteHistory.pop();
-  if (prev) {
-    restoreScroll = prev.scrollTop;
-    openNote(prev.filename, true);
-  } else {
-    closeModal();
-  }
+function showNoteList() {
+  document.getElementById('note-view').style.display = 'none';
+  document.getElementById('note-list').style.display = 'block';
+  document.getElementById('note-content').innerHTML = '';
+  window.scrollTo(0, 0);
 }
 
-function closeModal() {
-  document.getElementById('modal-overlay').classList.remove('open');
-  noteHistory = [];
-  currentNote = '';
-  restoreScroll = 0;
-}
-
-// click overlay background → close; click .md link → open in modal
+// click .md / .html link inside note view
 (function() {
-  document.getElementById('modal-overlay').addEventListener('click', function(e) {
-    // check for .md link click first
-    var a = e.target.closest('a[href$=".md"]');
-    if (a) {
-      var href = a.getAttribute('href');
+  document.getElementById('note-view').addEventListener('click', function(e) {
+    var a = e.target.closest('a');
+    if (!a) return;
+    var href = a.getAttribute('href');
+    if (!href) return;
+
+    // .md link → open inline
+    if (href.match(/\.md$/)) {
       var decoded;
       try { decoded = decodeURIComponent(href); } catch(ignore) { decoded = href; }
       if (!isShortNote(decoded)) {
@@ -518,10 +487,33 @@ function closeModal() {
       }
       return;
     }
-    // close when clicking overlay background
-    if (e.target === this) closeModal();
+
+    // .html link in llm-canvas-test → open in demo-player
+    if (href.match(/llm-canvas-test\/.*\.html$/)) {
+      e.preventDefault();
+      var label = a.textContent || href;
+      var player = document.getElementById('demo-player');
+      var frame = document.getElementById('demo-frame');
+      document.getElementById('demo-label').textContent = label;
+      frame.innerHTML = '';
+      var iframe = document.createElement('iframe');
+      iframe.src = href;
+      frame.appendChild(iframe);
+      player.classList.add('active');
+      // smooth scroll to player
+      player.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   });
 })();
+
+function closeDemoPlayer() {
+  var player = document.getElementById('demo-player');
+  if (player) {
+    player.classList.remove('active');
+    document.getElementById('demo-frame').innerHTML = '';
+    document.getElementById('demo-label').textContent = '';
+  }
+}
 </script>
 </body>
 </html>
