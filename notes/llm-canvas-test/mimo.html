@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deep Ocean — 500m</title>
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+"use strict";
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
+
+// ── Random helpers ──
+const rand = (a, b) => a + Math.random() * (b - a);
+const randInt = (a, b) => Math.floor(rand(a, b + 1));
+const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// ── Marine Snow ──
+const SNOW_COUNT = 1800;
+const snow = [];
+for (let i = 0; i < SNOW_COUNT; i++) {
+  snow.push({
+    x: rand(0, 1),        // normalized 0‑1
+    y: rand(0, 1),
+    r: rand(0.6, 2.4),
+    speed: rand(0.00008, 0.0003),
+    drift: rand(-0.00015, 0.00015),
+    phase: rand(0, Math.PI * 2),
+    alpha: rand(0.15, 0.55),
+    // displacement from pressure waves
+    dispX: 0, dispY: 0
+  });
+}
+
+// ── Bioluminescent plankton (ocean floor) ──
+const PLANKTON_COUNT = 120;
+const plankton = [];
+for (let i = 0; i < PLANKTON_COUNT; i++) {
+  plankton.push({
+    x: rand(0, 1),
+    baseAlpha: 0,
+    alpha: 0,
+    r: rand(2, 5),
+    hue: rand(160, 195)   // cold blue-green
+  });
+}
+
+// ── Whale ──
+const whale = {
+  x: -0.3,               // normalized, starts off‑screen left
+  y: 0.35,
+  speed: 0.00012,
+  // animation
+  tailPhase: 0,
+  tailSpeed: 0.0008,
+  bodyLen: 0,             // set each frame based on H
+};
+
+// ── Pressure wave rings ──
+const waves = [];         // {x, y, born, colors:[{h,s,l,maxR,decay}]}
+let nextSongTime = rand(8, 10); // seconds until next song
+let songTimer = 0;
+
+function spawnSong(wx, wy) {
+  // Multiple rings with staggered start
+  const ringDefs = [
+    { h: 185, s: 65, l: 35, maxR: 0.55, decay: 0.045, width: 0.025, delay: 0 },
+    { h: 260, s: 50, l: 30, maxR: 0.50, decay: 0.038, width: 0.022, delay: 0.4 },
+    { h: 45,  s: 70, l: 45, maxR: 0.35, decay: 0.065, width: 0.018, delay: 0.8 },
+    { h: 200, s: 55, l: 28, maxR: 0.60, decay: 0.030, width: 0.030, delay: 1.3 },
+    { h: 270, s: 45, l: 32, maxR: 0.45, decay: 0.040, width: 0.020, delay: 1.8 },
+    { h: 50,  s: 60, l: 40, maxR: 0.30, decay: 0.060, width: 0.015, delay: 2.2 },
+    { h: 190, s: 60, l: 30, maxR: 0.52, decay: 0.035, width: 0.028, delay: 2.8 },
+  ];
+  for (const rd of ringDefs) {
+    waves.push({
+      x: wx, y: wy,
+      born: time + rd.delay,
+      h: rd.h, s: rd.s, l: rd.l,
+      maxR: rd.maxR,
+      decay: rd.decay,
+      width: rd.width,
+      alive: true
+    });
+  }
+}
+
+// ── Time ──
+let time = 0;            // seconds
+let lastT = performance.now();
+
+// ── Drawing helpers ──
+
+function drawBackground() {
+  // Deep indigo at top → midnight blue‑black at bottom
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0,   "#1a1040");   // deep indigo
+  grad.addColorStop(0.4, "#0d0d30");
+  grad.addColorStop(0.75, "#070818");
+  grad.addColorStop(1,   "#020210");   // midnight blue‑black
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// ── Whale drawing ──
+function drawWhale() {
+  const scale = H * 0.13;   // whale body ~13% of screen height
+  const cx = whale.x * W;
+  const cy = whale.y * H;
+  const tailAmp = scale * 0.18;
+  const tailWave = Math.sin(whale.tailPhase) * tailAmp;
+  const headDir = 1; // left‑to‑right
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // Body parameters
+  const bodyLen = scale * 2.6;
+  const bodyH   = scale * 0.55;
+
+  // Slight up/down pitch from tail
+  const pitch = tailWave * 0.003;
+
+  // ── Main body (elliptical shape) ──
+  ctx.save();
+  ctx.rotate(pitch * 0.3);
+
+  // Shadow / glow under whale
+  const glowGrad = ctx.createRadialGradient(0, bodyH * 0.5, 0, 0, bodyH * 0.5, bodyLen * 0.6);
+  glowGrad.addColorStop(0, "rgba(30,60,100,0.12)");
+  glowGrad.addColorStop(1, "rgba(30,60,100,0)");
+  ctx.fillStyle = glowGrad;
+  ctx.fillRect(-bodyLen * 0.5, -bodyH * 0.2, bodyLen, bodyH * 2);
+
+  // Upper body — grey‑blue
+  ctx.beginPath();
+  ctx.moveTo(-bodyLen * 0.48, 0);
+  // Top curve (dorsal)
+  ctx.bezierCurveTo(
+    -bodyLen * 0.3, -bodyH * 1.15,
+     bodyLen * 0.15, -bodyH * 1.2,
+     bodyLen * 0.35, -bodyH * 0.6
+  );
+  // Head slope
+  ctx.bezierCurveTo(
+     bodyLen * 0.45, -bodyH * 0.3,
+     bodyLen * 0.52, -bodyH * 0.05,
+     bodyLen * 0.5,  bodyH * 0.1
+  );
+  // Belly
+  ctx.bezierCurveTo(
+     bodyLen * 0.48, bodyH * 0.6,
+     bodyLen * 0.2,  bodyH * 1.05,
+    -bodyLen * 0.1,  bodyH * 0.95
+  );
+  // Tail stock
+  ctx.bezierCurveTo(
+    -bodyLen * 0.3,  bodyH * 0.8,
+    -bodyLen * 0.45, bodyH * 0.35,
+    -bodyLen * 0.48, 0
+  );
+  ctx.closePath();
+
+  // Gradient: grey‑blue top, pale belly
+  const bodyGrad = ctx.createLinearGradient(0, -bodyH * 1.2, 0, bodyH);
+  bodyGrad.addColorStop(0,   "#3a4f6a");
+  bodyGrad.addColorStop(0.3, "#4a6580");
+  bodyGrad.addColorStop(0.55, "#5a7a95");
+  bodyGrad.addColorStop(0.75, "#8aaabb");
+  bodyGrad.addColorStop(1,   "#b5ccd8");
+  ctx.fillStyle = bodyGrad;
+  ctx.fill();
+
+  // Dorsal ridge line
+  ctx.beginPath();
+  ctx.moveTo(-bodyLen * 0.15, -bodyH * 1.0);
+  ctx.quadraticCurveTo(bodyLen * 0.05, -bodyH * 1.15, bodyLen * 0.2, -bodyH * 0.85);
+  ctx.strokeStyle = "rgba(30,50,70,0.35)";
+  ctx.lineWidth = scale * 0.015;
+  ctx.stroke();
+
+  // Small dorsal fin
+  ctx.beginPath();
+  ctx.moveTo(-bodyLen * 0.08, -bodyH * 1.05);
+  ctx.quadraticCurveTo(-bodyLen * 0.02, -bodyH * 1.3, bodyLen * 0.06, -bodyH * 1.0);
+  ctx.fillStyle = "#3a5570";
+  ctx.fill();
+
+  // Ventral grooves (throat pleats)
+  ctx.save();
+  ctx.globalAlpha = 0.12;
+  for (let i = 0; i < 12; i++) {
+    const t = i / 11;
+    const gx = lerp(bodyLen * 0.35, -bodyLen * 0.05, t);
+    const gy = lerp(bodyH * 0.15, bodyH * 0.75, t);
+    const gw = lerp(scale * 0.18, scale * 0.06, t);
+    ctx.beginPath();
+    ctx.moveTo(gx, gy - gw * 0.5);
+    ctx.quadraticCurveTo(gx + gw * 0.3, gy, gx, gy + gw * 0.5);
+    ctx.strokeStyle = "#2a4060";
+    ctx.lineWidth = scale * 0.008;
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Eye
+  ctx.beginPath();
+  ctx.arc(bodyLen * 0.38, -bodyH * 0.15, scale * 0.025, 0, Math.PI * 2);
+  ctx.fillStyle = "#1a2530";
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(bodyLen * 0.385, -bodyH * 0.16, scale * 0.008, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(200,220,240,0.5)";
+  ctx.fill();
+
+  // Mouth line
+  ctx.beginPath();
+  ctx.moveTo(bodyLen * 0.5, bodyH * 0.08);
+  ctx.quadraticCurveTo(bodyLen * 0.47, bodyH * 0.2, bodyLen * 0.38, bodyH * 0.22);
+  ctx.strokeStyle = "rgba(20,35,50,0.3)";
+  ctx.lineWidth = scale * 0.012;
+  ctx.stroke();
+
+  ctx.restore();
+
+  // ── Tail flukes ──
+  ctx.save();
+  const tailBaseX = -bodyLen * 0.48;
+  const tailBaseY = tailWave * 0.6;
+  ctx.translate(tailBaseX, tailBaseY);
+  ctx.rotate(tailWave * 0.005);
+
+  // Tail stock (peduncle)
+  ctx.beginPath();
+  ctx.moveTo(0, -bodyH * 0.12);
+  ctx.quadraticCurveTo(-scale * 0.25, -bodyH * 0.08, -scale * 0.4, -bodyH * 0.15);
+  ctx.lineTo(-scale * 0.4, bodyH * 0.15);
+  ctx.quadraticCurveTo(-scale * 0.25, bodyH * 0.08, 0, bodyH * 0.12);
+  ctx.closePath();
+  ctx.fillStyle = "#4a6580";
+  ctx.fill();
+
+  // Flukes
+  const flukeSpan = scale * 0.55;
+  const flukeWave = tailWave * 0.08;
+  ctx.save();
+  ctx.translate(-scale * 0.4, 0);
+
+  // Left fluke
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(-flukeSpan * 0.3, -flukeSpan * 0.5 + flukeWave, -flukeSpan * 0.7, -flukeSpan * 0.25 + flukeWave);
+  ctx.quadraticCurveTo(-flukeSpan * 0.5, 0, -flukeSpan * 0.2, flukeSpan * 0.05);
+  ctx.closePath();
+  ctx.fillStyle = "#4a6078";
+  ctx.fill();
+
+  // Right fluke
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(-flukeSpan * 0.3, flukeSpan * 0.5 - flukeWave, -flukeSpan * 0.7, flukeSpan * 0.25 - flukeWave);
+  ctx.quadraticCurveTo(-flukeSpan * 0.5, 0, -flukeSpan * 0.2, -flukeSpan * 0.05);
+  ctx.closePath();
+  ctx.fillStyle = "#4a6078";
+  ctx.fill();
+
+  // Fluke notch
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(-flukeSpan * 0.15, 0);
+  ctx.strokeStyle = "#3a5570";
+  ctx.lineWidth = scale * 0.015;
+  ctx.stroke();
+
+  ctx.restore();
+  ctx.restore();
+  ctx.restore();
+}
+
+// ── Pressure wave rings ──
+function drawWaves() {
+  const aspect = W / H;
+  for (const w of waves) {
+    if (!w.alive) continue;
+    const age = time - w.born;
+    if (age < 0) continue;
+    const progress = age * w.decay * 5;
+    if (progress > 1.2) { w.alive = false; continue; }
+
+    const maxPx = w.maxR * Math.max(W, H);
+    const r = progress * maxPx;
+    const alpha = clamp(1 - progress * 0.9, 0, 1) * 0.55;
+    const lineW = w.width * Math.max(W, H) * (1 - progress * 0.5);
+    if (lineW < 0.5) continue;
+
+    const cx = w.x * W;
+    const cy = w.y * H;
+
+    // Draw ellipse (perspective squish for depth feel)
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(1, 0.55);  // flatten vertically for underwater perspective
+
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r, r * 0.85, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(${w.h}, ${w.s}%, ${w.l}%, ${alpha})`;
+    ctx.lineWidth = lineW;
+    ctx.stroke();
+
+    // Soft glow
+    if (lineW > 2) {
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r, r * 0.85, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = `hsla(${w.h}, ${w.s}%, ${w.l + 15}%, ${alpha * 0.3})`;
+      ctx.lineWidth = lineW * 3;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+}
+
+// ── Interference patterns ──
+function drawInterference() {
+  // Where two wave rings are close in radius, draw iridescent highlights
+  const living = waves.filter(w => w.alive && time >= w.born);
+  const maxPx = Math.max(W, H);
+  for (let i = 0; i < living.length; i++) {
+    for (let j = i + 1; j < living.length; j++) {
+      const a = living[i], b = living[j];
+      const aAge = time - a.born, bAge = time - b.born;
+      const aR = aAge * a.decay * 5 * a.maxR * maxPx;
+      const bR = bAge * b.decay * 5 * b.maxR * maxPx;
+      const diff = Math.abs(aR - bR);
+      if (diff < 35 && aR > 10 && bR > 10) {
+        const overlap = 1 - diff / 35;
+        const cx = (a.x * W + b.x * W) / 2;
+        const cy = (a.y * H + b.y * H) / 2;
+        const r = (aR + bR) / 2;
+        const hue = (a.h + b.h + time * 80) % 360;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(1, 0.55);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r, r * 0.85, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = `hsla(${hue}, 80%, 60%, ${overlap * 0.25})`;
+        ctx.lineWidth = 4 + overlap * 6;
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+}
+
+// ── Marine snow update ──
+function updateSnow(dt) {
+  const dtSec = dt / 1000;
+  for (const p of snow) {
+    // Gentle current
+    const cx = Math.sin(time * 0.3 + p.phase) * 0.00005;
+    p.x += (p.drift + cx) * dt * 0.06;
+    p.y += p.speed * dt * 0.06;
+
+    // Pressure wave displacement
+    p.dispX *= 0.96;
+    p.dispY *= 0.96;
+
+    // Check wave fronts
+    const px = p.x * W, py = p.y * H;
+    const maxPx = Math.max(W, H);
+    for (const w of waves) {
+      if (!w.alive || time < w.born) continue;
+      const age = time - w.born;
+      const waveR = age * w.decay * 5 * w.maxR * maxPx;
+      const dx = px - w.x * W, dy = (py - w.y * H) * (1 / 0.55);
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const thickness = w.width * maxPx * 2;
+      if (Math.abs(dist - waveR) < thickness && waveR > 10) {
+        const strength = 0.6;
+        const nx = dx / (dist + 1), ny = dy / (dist + 1);
+        p.dispX += nx * strength;
+        p.dispY += ny * strength * 0.3;
+        p.alpha = clamp(p.alpha + 0.02, 0, 0.7);
+      }
+    }
+
+    // Wrap
+    if (p.y > 1.02) { p.y = -0.02; p.x = rand(0, 1); }
+    if (p.x < -0.05) p.x = 1.05;
+    if (p.x > 1.05) p.x = -0.05;
+  }
+}
+
+function drawSnow() {
+  for (const p of snow) {
+    const sx = p.x * W + p.dispX * W * 0.02;
+    const sy = p.y * H + p.dispY * H * 0.02;
+    const a = clamp(p.alpha, 0, 0.7);
+    ctx.beginPath();
+    ctx.arc(sx, sy, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(200,210,225,${a})`;
+    ctx.fill();
+  }
+}
+
+// ── Plankton ──
+function updatePlankton(dt) {
+  const floorY = 0.88;  // ocean floor at 88% of screen height
+  const maxPx = Math.max(W, H);
+
+  for (const p of plankton) {
+    // Dim baseline flicker
+    const flicker = Math.sin(time * 1.5 + p.x * 50) * 0.05 + 0.03;
+    p.baseAlpha = clamp(flicker, 0, 0.08);
+    let extraAlpha = 0;
+
+    // Check if any wave front is near this plankton
+    const px = p.x * W;
+    const py = floorY * H;
+    for (const w of waves) {
+      if (!w.alive || time < w.born) continue;
+      const age = time - w.born;
+      const waveR = age * w.decay * 5 * w.maxR * maxPx;
+      const dx = px - w.x * W;
+      const dy = (py - w.y * H) * (1 / 0.55);
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const ringThickness = w.width * maxPx * 3;
+      if (Math.abs(dist - waveR) < ringThickness && waveR > 10) {
+        const proximity = 1 - Math.abs(dist - waveR) / ringThickness;
+        extraAlpha = Math.max(extraAlpha, proximity * 0.7);
+      }
+    }
+
+    p.alpha = lerp(p.alpha, p.baseAlpha + extraAlpha, 0.08);
+  }
+}
+
+function drawPlankton() {
+  const floorY = 0.88;
+  for (const p of plankton) {
+    if (p.alpha < 0.01) continue;
+    const sx = p.x * W;
+    const sy = floorY * H + Math.sin(time + p.x * 20) * 3;
+    const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, p.r * 4);
+    glow.addColorStop(0, `hsla(${p.hue}, 80%, 65%, ${p.alpha})`);
+    glow.addColorStop(0.5, `hsla(${p.hue}, 80%, 50%, ${p.alpha * 0.3})`);
+    glow.addColorStop(1, `hsla(${p.hue}, 80%, 40%, 0)`);
+    ctx.beginPath();
+    ctx.arc(sx, sy, p.r * 4, 0, Math.PI * 2);
+    ctx.fillStyle = glow;
+    ctx.fill();
+
+    // Bright core
+    ctx.beginPath();
+    ctx.arc(sx, sy, p.r * 0.6, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${p.hue}, 70%, 80%, ${p.alpha * 0.8})`;
+    ctx.fill();
+  }
+}
+
+// ── Ocean floor suggestion ──
+function drawFloor() {
+  const floorY = 0.88;
+  const grad = ctx.createLinearGradient(0, H * floorY - 30, 0, H);
+  grad.addColorStop(0, "rgba(2,5,15,0)");
+  grad.addColorStop(0.3, "rgba(3,6,18,0.6)");
+  grad.addColorStop(1, "rgba(5,8,20,0.95)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, H * floorY - 30, W, H * (1 - floorY) + 30);
+
+  // Subtle sand ripples
+  ctx.save();
+  ctx.globalAlpha = 0.04;
+  for (let i = 0; i < 20; i++) {
+    const ry = H * floorY + i * 6 + Math.sin(i * 0.7) * 4;
+    ctx.beginPath();
+    ctx.moveTo(0, ry);
+    for (let x = 0; x <= W; x += 40) {
+      ctx.lineTo(x, ry + Math.sin(x * 0.01 + i * 1.3 + time * 0.2) * 3);
+    }
+    ctx.strokeStyle = "#4a5568";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ── Ambient deep‑sea fog / haze layers ──
+function drawHaze() {
+  // Subtle moving fog patches
+  ctx.save();
+  for (let i = 0; i < 5; i++) {
+    const hx = (Math.sin(time * 0.05 + i * 2.1) * 0.5 + 0.5) * W;
+    const hy = (Math.cos(time * 0.03 + i * 1.7) * 0.3 + 0.4) * H;
+    const hr = W * 0.2 + Math.sin(time * 0.1 + i) * 30;
+    const fogGrad = ctx.createRadialGradient(hx, hy, 0, hx, hy, hr);
+    fogGrad.addColorStop(0, "rgba(20,30,60,0.04)");
+    fogGrad.addColorStop(1, "rgba(20,30,60,0)");
+    ctx.fillStyle = fogGrad;
+    ctx.fillRect(hx - hr, hy - hr, hr * 2, hr * 2);
+  }
+  ctx.restore();
+}
+
+// ── Main loop ──
+function frame(now) {
+  const dt = Math.min(now - lastT, 50);
+  lastT = now;
+  time += dt / 1000;
+
+  // Update whale
+  whale.x += whale.speed * dt * 0.06;
+  whale.y = 0.35 + Math.sin(time * 0.2) * 0.03;
+  whale.tailPhase += whale.tailSpeed * dt;
+  if (whale.x > 1.35) {
+    whale.x = -0.35;
+    whale.y = rand(0.25, 0.45);
+  }
+
+  // Song timer
+  songTimer += dt / 1000;
+  if (songTimer >= nextSongTime) {
+    songTimer = 0;
+    nextSongTime = rand(8, 10);
+    const songX = whale.x + 0.06;  // throat area (front of whale)
+    const songY = whale.y + 0.02;
+    spawnSong(songX, songY);
+  }
+
+  // Clean dead waves
+  for (let i = waves.length - 1; i >= 0; i--) {
+    if (!waves[i].alive) waves.splice(i, 1);
+  }
+
+  // Update particles
+  updateSnow(dt);
+  updatePlankton(dt);
+
+  // ── Draw ──
+  drawBackground();
+  drawHaze();
+  drawFloor();
+  drawPlankton();
+  drawSnow();
+  drawWaves();
+  drawInterference();
+  drawWhale();
+
+  // Vignette
+  const vig = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
+  vig.addColorStop(0, "rgba(0,0,0,0)");
+  vig.addColorStop(1, "rgba(0,0,0,0.55)");
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

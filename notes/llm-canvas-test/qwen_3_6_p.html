@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deep Ocean — 500m</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="ocean"></canvas>
+<script>
+(() => {
+"use strict";
+
+const canvas = document.getElementById("ocean");
+const ctx = canvas.getContext("2d");
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  generatePlankton();
+}
+window.addEventListener("resize", resize);
+
+// ── Helpers ──────────────────────────────────────────────────────────
+function rand(a, b) { return a + Math.random() * (b - a); }
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+// ── Background gradient (pre-rendered) ───────────────────────────────
+let bgCanvas;
+function buildBackground() {
+  bgCanvas = document.createElement("canvas");
+  bgCanvas.width = W;
+  bgCanvas.height = H;
+  const bgCtx = bgCanvas.getContext("2d");
+  const g = bgCtx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0.0,  "#0a0e2a");
+  g.addColorStop(0.3,  "#091025");
+  g.addColorStop(0.6,  "#060c1e");
+  g.addColorStop(1.0,  "#020412");
+  bgCtx.fillStyle = g;
+  bgCtx.fillRect(0, 0, W, H);
+  // subtle caustic noise
+  bgCtx.globalAlpha = 0.03;
+  for (let i = 0; i < 300; i++) {
+    const x = rand(0, W), y = rand(0, H * 0.6);
+    const r = rand(40, 200);
+    bgCtx.fillStyle = `hsla(${rand(210,240)},50%,40%,0.02)`;
+    bgCtx.beginPath();
+    bgCtx.ellipse(x, y, r, r * 0.4, 0, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+  bgCtx.globalAlpha = 1;
+}
+
+// ── Currents (smooth 2D vector field, time-varying) ──────────────────
+const currentCells = [];
+const CELL_W = 160, CELL_H = 120;
+let cols, rows;
+let currentT = 0;
+
+function initCurrents() {
+  cols = Math.ceil(W / CELL_W) + 2;
+  rows = Math.ceil(H / CELL_H) + 2;
+  currentCells.length = 0;
+  for (let i = 0; i < cols * rows; i++) {
+    currentCells.push({ vx: rand(-0.3, 0.3), vy: rand(-0.05, 0.05), phase: rand(0, 6.28) });
+  }
+}
+
+function getCell(ix, iy) {
+  return currentCells[clamp(ix, 0, cols - 1) * rows + clamp(iy, 0, rows - 1)] || { vx: 0, vy: 0, phase: 0 };
+}
+
+function sampleCurrent(x, y, t) {
+  const cx = x / CELL_W, cy = y / CELL_H;
+  const ix = Math.floor(cx), iy = Math.floor(cy);
+  const fx = cx - ix, fy = cy - iy;
+  const s = (s) => s * s * (3 - 2 * s); // smoothstep
+  const sx = s(fx), sy = s(fy);
+  const a = getCell(ix, iy), b = getCell(ix + 1, iy);
+  const c = getCell(ix, iy + 1), d = getCell(ix + 1, iy + 1);
+  const t1 = Math.sin(t * 0.3 + a.phase) * 0.6 + 0.4;
+  const t2 = Math.sin(t * 0.25 + b.phase) * 0.6 + 0.4;
+  const t3 = Math.sin(t * 0.35 + c.phase) * 0.6 + 0.4;
+  const t4 = Math.sin(t * 0.2 + d.phase) * 0.6 + 0.4;
+  const vx = lerp(lerp(a.vx * t1, b.vx * t2, sx), lerp(c.vx * t3, d.vx * t4, sx), sy);
+  const vy = lerp(lerp(a.vy * t1, b.vy * t2, sx), lerp(c.vy * t3, d.vy * t4, sx), sy);
+  return { vx, vy };
+}
+
+// ── Marine Snow ──────────────────────────────────────────────────────
+const NUM_SNOW = 3500;
+const snow = [];
+
+function initSnow() {
+  snow.length = 0;
+  for (let i = 0; i < NUM_SNOW; i++) {
+    snow.push({
+      x: rand(0, W),
+      y: rand(0, H),
+      size: rand(0.5, 2.5),
+      baseFall: rand(0.08, 0.35),
+      opacity: rand(0.2, 0.7),
+      drift: rand(0, 6.28),
+      shiver: 0,
+      shiverDecay: rand(3, 6)
+    });
+  }
+}
+
+// ── Bioluminescent Plankton ──────────────────────────────────────────
+let plankton = [];
+
+function generatePlankton() {
+  plankton = [];
+  const floorY = H * 0.88;
+  const count = Math.floor(W * 1.2);
+  for (let i = 0; i < count; i++) {
+    plankton.push({
+      x: rand(0, W),
+      y: rand(floorY, H),
+      size: rand(1.5, 4),
+      brightness: 0,
+      hue: rand(150, 180),
+      phase: rand(0, 6.28)
+    });
+  }
+}
+
+// ── Whale ────────────────────────────────────────────────────────────
+const whale = {
+  x: -300,
+  y: 0,            // will be set in init
+  vx: 0.4,         // px per frame — unhurried
+  tailPhase: 0,
+  tailSpeed: 1.0,  // oscillations per second approx
+  bodyLen: 0,      // computed as fraction of W
+  pectoralPhase: 0
+};
+
+function whaleWidth() { return Math.max(320, W * 0.30); }
+function whaleHeight() { return whaleWidth() * 0.18; }
+
+// ── Songs (pressure waves) ───────────────────────────────────────────
+const songs = [];
+let nextSongTime = 0;
+
+function scheduleNextSong(now) {
+  nextSongTime = now + rand(8000, 10000);
+}
+
+function emitSong(now) {
+  const wy = whale.y;
+  const wx = whale.x + whaleWidth() * 0.22; // throat position
+  // Three ring layers: teal, blue-violet, gold — each different decay
+  const layers = [
+    { hue: 175, sat: 60, light: 50, maxR: Math.max(W, H) * 0.9, decay: 0.0004, lineWidth: 18 },
+    { hue: 260, sat: 50, light: 45, maxR: Math.max(W, H) * 0.85, decay: 0.0005, lineWidth: 14 },
+    { hue: 45,  sat: 55, light: 55, maxR: Math.max(W, H) * 0.75, decay: 0.0006, lineWidth: 10 },
+  ];
+  songs.push({ x: wx, y: wy, born: now, layers });
+}
+
+// ── Init ─────────────────────────────────────────────────────────────
+function init() {
+  resize();
+  buildBackground();
+  initCurrents();
+  initSnow();
+  whale.y = H * rand(0.30, 0.45);
+  whale.x = -whaleWidth();
+  scheduleNextSong(0);
+}
+
+// ── Draw Whale ───────────────────────────────────────────────────────
+function drawWhale(t) {
+  const len = whaleWidth();
+  const maxH = whaleHeight();
+  const cx = whale.x, cy = whale.y;
+  const tailSwing = Math.sin(whale.tailPhase) * maxH * 0.45;
+  const pectoralSwing = Math.sin(t * 0.8) * 0.15;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // Body shape — main outline
+  // We'll draw a smooth bezier body
+  const bodyPath = () => {
+    ctx.beginPath();
+    // top edge from snout to tail peduncle
+    ctx.moveTo(len * 0.48, 0);  // snout tip
+    ctx.bezierCurveTo(len * 0.45, -maxH * 0.25, len * 0.25, -maxH * 0.55, -len * 0.10, -maxH * 0.58);
+    ctx.bezierCurveTo(-len * 0.25, -maxH * 0.55, -len * 0.38, -maxH * 0.40, -len * 0.42, -maxH * 0.12);
+    // bottom edge back to snout
+    ctx.bezierCurveTo(-len * 0.38, maxH * 0.35, -len * 0.25, maxH * 0.50, len * 0.05, maxH * 0.48);
+    ctx.bezierCurveTo(len * 0.25, maxH * 0.38, len * 0.42, maxH * 0.15, len * 0.48, 0);
+    ctx.closePath();
+  };
+
+  // Body fill gradient
+  bodyPath();
+  const bodyGrad = ctx.createLinearGradient(0, -maxH * 0.58, 0, maxH * 0.48);
+  bodyGrad.addColorStop(0,   "#2a3a5c");  // dark grey-blue top
+  bodyGrad.addColorStop(0.35, "#3d5578");
+  bodyGrad.addColorStop(0.55, "#4a6285");
+  bodyGrad.addColorStop(0.7,  "#8a9fb5");
+  bodyGrad.addColorStop(1.0,  "#b8c5d6");  // pale belly
+  ctx.fillStyle = bodyGrad;
+  ctx.fill();
+
+  // Subtle body contour lines
+  ctx.strokeStyle = "rgba(30,50,80,0.15)";
+  ctx.lineWidth = 0.5;
+  bodyPath();
+  ctx.stroke();
+
+  // Dorsal ridge (very subtle)
+  ctx.beginPath();
+  ctx.moveTo(len * 0.05, -maxH * 0.57);
+  ctx.quadraticCurveTo(-len * 0.05, -maxH * 0.62, -len * 0.18, -maxH * 0.55);
+  ctx.strokeStyle = "rgba(25,40,70,0.3)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Eye
+  const eyeX = len * 0.30, eyeY = -maxH * 0.08;
+  ctx.beginPath();
+  ctx.ellipse(eyeX, eyeY, 3, 2.5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "#0a0a15";
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(eyeX + 0.8, eyeY - 0.5, 0.8, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(200,220,255,0.3)";
+  ctx.fill();
+
+  // Flipper shadow (subtle line)
+  ctx.beginPath();
+  ctx.moveTo(len * 0.12, maxH * 0.35);
+  ctx.quadraticCurveTo(len * 0.05, maxH * 0.55, -len * 0.08, maxH * 0.45);
+  ctx.strokeStyle = "rgba(40,60,90,0.25)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // ── Tail stock + flukes ──
+  ctx.save();
+  // Tail stock attachment
+  const stockX = -len * 0.42;
+  const stockY = -maxH * 0.12 + tailSwing * 0.5;
+
+  // Tail stock (narrowing cylinder)
+  ctx.beginPath();
+  ctx.moveTo(stockX, -maxH * 0.10);
+  ctx.quadraticCurveTo(stockX - len * 0.08, -maxH * 0.06 + tailSwing * 0.3, stockX - len * 0.14, tailSwing * 0.6);
+  ctx.quadraticCurveTo(stockX - len * 0.08, maxH * 0.04 + tailSwing * 0.3, stockX, maxH * 0.10);
+  ctx.closePath();
+  ctx.fillStyle = "#2d4466";
+  ctx.fill();
+
+  // Flukes at the end of stock
+  ctx.translate(stockX - len * 0.14, tailSwing * 0.6);
+  const flukeAngle = tailSwing / (maxH * 0.45) * 0.5; // angle based on swing
+  ctx.rotate(flukeAngle);
+
+  const flukeLen = len * 0.14;
+  const flukeSpread = maxH * 0.75;
+
+  // Upper fluke
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(-flukeLen * 0.5, -flukeSpread * 0.6, -flukeLen, -flukeSpread);
+  ctx.quadraticCurveTo(-flukeLen * 0.7, -flukeSpread * 0.35, -flukeLen * 0.6, -flukeSpread * 0.05);
+  ctx.closePath();
+  const flukeGrad1 = ctx.createLinearGradient(0, 0, 0, -flukeSpread);
+  flukeGrad1.addColorStop(0, "#2a3e5e");
+  flukeGrad1.addColorStop(1, "#1a2a45");
+  ctx.fillStyle = flukeGrad1;
+  ctx.fill();
+
+  // Lower fluke
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(-flukeLen * 0.5, flukeSpread * 0.5, -flukeLen, flukeSpread * 0.85);
+  ctx.quadraticCurveTo(-flukeLen * 0.7, flukeSpread * 0.3, -flukeLen * 0.6, flukeSpread * 0.05);
+  ctx.closePath();
+  const flukeGrad2 = ctx.createLinearGradient(0, 0, 0, flukeSpread * 0.85);
+  flukeGrad2.addColorStop(0, "#2a3e5e");
+  flukeGrad2.addColorStop(1, "#1a2a45");
+  ctx.fillStyle = flukeGrad2;
+  ctx.fill();
+
+  // Fluke center ridge
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(-flukeLen * 0.85, 0);
+  ctx.strokeStyle = "rgba(20,35,60,0.3)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.restore(); // tail
+
+  // Pectoral flipper
+  ctx.save();
+  const flipX = len * 0.15, flipY = maxH * 0.30;
+  ctx.translate(flipX, flipY);
+  ctx.rotate(pectoralSwing);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(len * 0.02, maxH * 0.55, -len * 0.02, maxH * 0.70);
+  ctx.quadraticCurveTo(-len * 0.06, maxH * 0.50, -len * 0.04, 0);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(45,65,100,0.6)";
+  ctx.fill();
+  ctx.restore();
+
+  ctx.restore(); // whale
+}
+
+// ── Draw Songs ───────────────────────────────────────────────────────
+function drawSongs(now) {
+  for (let si = songs.length - 1; si >= 0; si--) {
+    const s = songs[si];
+    const age = now - s.born;
+    let allDead = true;
+
+    for (let li = 0; li < s.layers.length; li++) {
+      const l = s.layers[li];
+      const r = age * 0.35; // expansion speed
+      if (r > l.maxR) continue;
+      allDead = false;
+
+      const alpha = Math.max(0, 1 - r / l.maxR) * 0.55;
+      if (alpha <= 0) continue;
+
+      const a = alpha * Math.exp(-l.decay * age);
+      if (a < 0.005) continue;
+
+      ctx.save();
+      ctx.strokeStyle = `hsla(${l.hue},${l.sat}%,${l.light}%,${a})`;
+      ctx.lineWidth = l.lineWidth * (1 - r / l.maxR * 0.5);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.shadowColor = `hsla(${l.hue},${l.sat}%,${l.light}%,${a * 0.6})`;
+      ctx.shadowBlur = 25;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Soft fill for thicker look
+      ctx.globalAlpha = a * 0.08;
+      ctx.fillStyle = `hsla(${l.hue},${l.sat}%,${l.light}%,1)`;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    if (allDead) {
+      songs.splice(si, 1);
+    }
+  }
+}
+
+// ── Interference (cheap: draw at overlaps with additive blend) ───────
+function drawInterference(now) {
+  ctx.globalCompositeOperation = "screen";
+  for (let i = 0; i < songs.length; i++) {
+    for (let j = i + 1; j < songs.length; j++) {
+      const a = songs[i], b = songs[j];
+      const dx = a.x - b.x, dy = a.y - b.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist === 0) continue;
+      // Check each layer pair
+      for (const la of a.layers) {
+        for (const lb of b.layers) {
+          const ra = (now - a.born) * 0.35;
+          const rb = (now - b.born) * 0.35;
+          const overlapDist = Math.abs(ra - rb);
+          if (overlapDist < 30) {
+            // Points on the line between centers where circles intersect
+            // Approximate: draw a soft glow at the midpoint region
+            const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+            const alpha = Math.max(0, 1 - overlapDist / 30) * 0.12;
+            if (alpha < 0.005) continue;
+            const hue = (la.hue + lb.hue) / 2;
+            ctx.fillStyle = `hsla(${hue},70%,65%,${alpha})`;
+            ctx.beginPath();
+            ctx.arc(mx, my, 40 + overlapDist * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+    }
+  }
+  ctx.globalCompositeOperation = "source-over";
+}
+
+// ── Update & Draw Marine Snow ────────────────────────────────────────
+function updateAndDrawSnow(dt, t, now) {
+  for (let i = 0; i < snow.length; i++) {
+    const p = snow[i];
+
+    // Current
+    const cur = sampleCurrent(p.x, p.y, t);
+    p.x += (cur.vx * 30 + Math.sin(p.drift + t * 0.5) * 0.3) * dt;
+    p.y += (p.baseFall + cur.vy * 15) * dt * 60;
+
+    // Shiver from songs
+    if (p.shiver > 0.01) {
+      p.x += Math.sin(now * 0.05 + i) * p.shiver * 3;
+      p.y += Math.cos(now * 0.04 + i * 1.3) * p.shiver * 1.5;
+      p.shiver *= Math.exp(-p.shiverDecay * dt);
+    }
+
+    // Check song wavefronts for shiver trigger
+    for (const s of songs) {
+      for (const l of s.layers) {
+        const r = (now - s.born) * 0.35;
+        const dx = p.x - s.x, dy = p.y - s.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (Math.abs(dist - r) < 15 && r < l.maxR) {
+          p.shiver = Math.min(1, p.shiver + 0.3);
+        }
+      }
+    }
+
+    // Wrap
+    if (p.y > H + 10) { p.y = -10; p.x = rand(0, W); }
+    if (p.x > W + 10) p.x = -10;
+    if (p.x < -10) p.x = W + 10;
+
+    // Draw
+    ctx.globalAlpha = p.opacity * (0.7 + 0.3 * Math.sin(t * 0.3 + i));
+    ctx.fillStyle = "#d8dce8";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ── Update & Draw Plankton ───────────────────────────────────────────
+function updateAndDrawPlankton(t, now) {
+  for (const p of plankton) {
+    // Check song wavefronts
+    for (const s of songs) {
+      for (const l of s.layers) {
+        const r = (now - s.born) * 0.35;
+        const dx = p.x - s.x, dy = p.y - s.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (Math.abs(dist - r) < 40 && r < l.maxR) {
+          p.brightness = Math.min(1, p.brightness + 0.45);
+        }
+      }
+    }
+
+    // Natural dim twinkle
+    const twinkle = 0.5 + 0.5 * Math.sin(t * 0.7 + p.phase);
+    p.brightness *= 0.985; // slow decay
+    if (p.brightness < 0.01) p.brightness = twinkle * 0.03; // barely visible
+
+    const a = clamp(p.brightness, 0, 1);
+    if (a < 0.01) continue;
+
+    ctx.save();
+    ctx.shadowColor = `hsla(${p.hue},80%,60%,${a * 0.8})`;
+    ctx.shadowBlur = 8 + a * 12;
+    ctx.fillStyle = `hsla(${p.hue},70%,70%,${a})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * (0.8 + a * 0.4), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ── Main Loop ────────────────────────────────────────────────────────
+let lastTime = 0;
+
+function frame(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.1);
+  lastTime = now;
+  const t = now / 1000;
+
+  // Background
+  ctx.drawImage(bgCanvas, 0, 0);
+
+  // Whale song timing
+  if (now >= nextSongTime) {
+    emitSong(now);
+    scheduleNextSong(now);
+  }
+
+  // Update whale
+  const len = whaleWidth();
+  whale.x += whale.vx * dt * 60;
+  whale.tailPhase += dt * whale.tailSpeed * Math.PI * 2;
+  whale.pectoralPhase += dt * 0.8;
+  if (whale.x > W + len + 100) {
+    whale.x = -len - 100;
+    whale.y = H * rand(0.25, 0.50);
+  }
+
+  // Currents update (slow drift)
+  currentT += dt;
+  for (const c of currentCells) {
+    c.phase += dt * 0.02;
+  }
+
+  // Draw order: plankton (behind) → marine snow → songs → interference → whale
+  updateAndDrawPlankton(t, now);
+  updateAndDrawSnow(dt, t, now);
+  drawSongs(now);
+  drawInterference(now);
+  drawWhale(t);
+
+  // Very subtle vignette
+  const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, "rgba(0,0,2,0.35)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+
+  requestAnimationFrame(frame);
+}
+
+// ── Start ────────────────────────────────────────────────────────────
+init();
+requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>

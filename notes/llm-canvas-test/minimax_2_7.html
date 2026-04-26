@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Ocean - 500m Depth</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            overflow: hidden;
+            background: #000;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="ocean"></canvas>
+    <script>
+        const canvas = document.getElementById('ocean');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+        
+        // === MARINE SNOW PARTICLES ===
+        const PARTICLE_COUNT = 2000;
+        const particles = [];
+        
+        class Particle {
+            constructor() {
+                this.reset(true);
+            }
+            
+            reset(initial = false) {
+                this.x = Math.random() * width;
+                this.y = initial ? Math.random() * height : -Math.random() * 100;
+                this.size = Math.random() * 2 + 0.5;
+                this.baseAlpha = Math.random() * 0.4 + 0.1;
+                this.alpha = this.baseAlpha;
+                this.speedY = Math.random() * 0.3 + 0.1;
+                this.speedX = (Math.random() - 0.5) * 0.1;
+                this.wobble = Math.random() * Math.PI * 2;
+                this.wobbleSpeed = Math.random() * 0.02 + 0.01;
+                this.wobbleAmp = Math.random() * 0.3 + 0.1;
+                this.affected = false;
+                this.affectTimer = 0;
+                this.scatterVelX = 0;
+                this.scatterVelY = 0;
+            }
+            
+            update(time) {
+                this.wobble += this.wobbleSpeed;
+                
+                // Apply wave scatter
+                if (this.affectTimer > 0) {
+                    this.affectTimer -= 0.016;
+                    this.x += this.scatterVelX;
+                    this.y += this.scatterVelY;
+                    this.scatterVelX *= 0.95;
+                    this.scatterVelY *= 0.95;
+                    this.alpha = this.baseAlpha + Math.sin(this.affectTimer * 20) * 0.3;
+                } else {
+                    this.alpha = this.baseAlpha;
+                    this.x += Math.sin(this.wobble) * this.wobbleAmp + this.speedX;
+                    this.y += this.speedY;
+                }
+                
+                if (this.y > height + 10) {
+                    this.reset();
+                }
+                if (this.x < -10) this.x = width + 10;
+                if (this.x > width + 10) this.x = -10;
+            }
+            
+            scatter(waveX, waveY, strength) {
+                const dx = this.x - waveX;
+                const dy = this.y - waveY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 200) {
+                    const angle = Math.atan2(dy, dx);
+                    const force = (200 - dist) / 200 * strength;
+                    this.scatterVelX = Math.cos(angle) * force * 2;
+                    this.scatterVelY = Math.sin(angle) * force * 1.5;
+                    this.affectTimer = 1;
+                }
+            }
+            
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(200, 220, 255, ${this.alpha})`;
+                ctx.fill();
+            }
+        }
+        
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            particles.push(new Particle());
+        }
+        
+        // === BLUE WHALE ===
+        const whale = {
+            x: -300,
+            y: height * 0.4,
+            baseY: height * 0.4,
+            speed: 0.4,
+            width: 450,
+            height: 140,
+            tailPhase: 0,
+            tailSpeed: 0.03,
+            bodyWave: 0,
+            bodyWaveSpeed: 0.015,
+            singing: false
+        };
+        
+        function drawWhale(time) {
+            const { x, y, width: w, height: h } = whale;
+            
+            ctx.save();
+            ctx.translate(x, y);
+            
+            // Body curve undulation
+            const bodyWave = Math.sin(whale.bodyWave) * 5;
+            
+            // Draw body segments for smooth curve
+            ctx.beginPath();
+            ctx.moveTo(-w * 0.45, bodyWave);
+            
+            // Top curve (back)
+            ctx.bezierCurveTo(
+                -w * 0.3, -h * 0.3 + bodyWave,
+                w * 0.1, -h * 0.45 + bodyWave,
+                w * 0.35, -h * 0.15 + bodyWave
+            );
+            
+            // Tail region
+            ctx.bezierCurveTo(
+                w * 0.45, 0 + bodyWave,
+                w * 0.55, -h * 0.2 + bodyWave,
+                w * 0.7, -h * 0.4 + Math.sin(whale.tailPhase) * 20
+            );
+            
+            // Tail flukes
+            ctx.lineTo(w * 0.78, -h * 0.7 + Math.sin(whale.tailPhase) * 25);
+            ctx.lineTo(w * 0.72, -h * 0.55 + Math.sin(whale.tailPhase) * 18);
+            ctx.lineTo(w * 0.75, -h * 0.5 + Math.sin(whale.tailPhase) * 15);
+            ctx.lineTo(w * 0.73, -h * 0.45 + Math.sin(whale.tailPhase) * 12);
+            ctx.lineTo(w * 0.7, -h * 0.35 + Math.sin(whale.tailPhase) * 8);
+            
+            // Center of tail
+            ctx.lineTo(w * 0.75, 0 + Math.sin(whale.tailPhase) * 5);
+            
+            // Lower tail flukes
+            ctx.lineTo(w * 0.73, h * 0.45 + Math.sin(whale.tailPhase) * 12);
+            ctx.lineTo(w * 0.75, h * 0.5 + Math.sin(whale.tailPhase) * 15);
+            ctx.lineTo(w * 0.72, h * 0.55 + Math.sin(whale.tailPhase) * 18);
+            ctx.lineTo(w * 0.78, h * 0.7 + Math.sin(whale.tailPhase) * 25);
+            
+            ctx.lineTo(w * 0.7, h * 0.35 + bodyWave);
+            
+            // Bottom curve (belly)
+            ctx.bezierCurveTo(
+                w * 0.55, h * 0.2 + bodyWave,
+                w * 0.3, h * 0.35 + bodyWave,
+                0, h * 0.25 + bodyWave
+            );
+            
+            ctx.bezierCurveTo(
+                -w * 0.2, h * 0.4 + bodyWave,
+                -w * 0.35, h * 0.3 + bodyWave,
+                -w * 0.45, bodyWave
+            );
+            
+            ctx.closePath();
+            
+            // Gradient fill: grey-blue top, pale belly
+            const bodyGrad = ctx.createLinearGradient(0, -h * 0.5, 0, h * 0.5);
+            bodyGrad.addColorStop(0, '#4a5568');
+            bodyGrad.addColorStop(0.3, '#5a6a7a');
+            bodyGrad.addColorStop(0.6, '#6a7a8a');
+            bodyGrad.addColorStop(1, '#c8d4e0');
+            
+            ctx.fillStyle = bodyGrad;
+            ctx.fill();
+            
+            // Subtle outline
+            ctx.strokeStyle = 'rgba(100, 120, 140, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Pectoral fin
+            ctx.beginPath();
+            ctx.moveTo(-w * 0.1, h * 0.15);
+            ctx.quadraticCurveTo(-w * 0.15, h * 0.5, -w * 0.35, h * 0.6);
+            ctx.quadraticCurveTo(-w * 0.25, h * 0.3, -w * 0.05, h * 0.2);
+            ctx.closePath();
+            ctx.fillStyle = '#5a6a7a';
+            ctx.fill();
+            
+            // Eye
+            ctx.beginPath();
+            ctx.ellipse(-w * 0.38, -h * 0.1, 5, 4, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#1a2a3a';
+            ctx.fill();
+            
+            // Mouth line
+            ctx.beginPath();
+            ctx.moveTo(-w * 0.42, h * 0.05);
+            ctx.quadraticCurveTo(-w * 0.35, h * 0.12, -w * 0.2, h * 0.1);
+            ctx.strokeStyle = 'rgba(30, 40, 50, 0.4)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+        
+        // === SOUND WAVES ===
+        const waves = [];
+        let nextWaveTime = 0;
+        
+        function createWave(x, y) {
+            waves.push({
+                x: x,
+                y: y,
+                radius: 0,
+                maxRadius: Math.max(width, height) * 1.5,
+                speed: 3,
+                alpha: 1,
+                colors: [
+                    { r: 20, g: 120, b: 140, decay: 0.0008 },   // teal
+                    { r: 80, g: 60, b: 180, decay: 0.0006 },   // blue-violet
+                    { r: 200, g: 180, b: 100, decay: 0.001 }   // gold
+                ],
+                rings: []
+            });
+        }
+        
+        function updateWaves() {
+            for (let i = waves.length - 1; i >= 0; i--) {
+                const wave = waves[i];
+                wave.radius += wave.speed;
+                wave.alpha = Math.max(0, 1 - wave.radius / wave.maxRadius);
+                
+                // Check particles for scattering
+                const ringRadius = wave.radius % 100;
+                for (const p of particles) {
+                    const dx = p.x - wave.x;
+                    const dy = p.y - wave.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const waveFront = wave.radius;
+                    const behindFront = waveFront - 40;
+                    
+                    if (dist > behindFront && dist < waveFront) {
+                        const force = (1 - (dist - behindFront) / 40) * 0.5 * wave.alpha;
+                        p.scatter(wave.x, wave.y, force);
+                    }
+                }
+                
+                // Bioluminescence trigger
+                if (wave.radius > height * 0.6 && wave.radius < height * 0.6 + wave.speed * 2) {
+                    triggerBioluminescence(wave);
+                }
+                
+                if (wave.radius > wave.maxRadius) {
+                    waves.splice(i, 1);
+                }
+            }
+        }
+        
+        function drawWaves() {
+            for (const wave of waves) {
+                // Draw multiple color rings with soft edges
+                for (let c = 0; c < wave.colors.length; c++) {
+                    const color = wave.colors[c];
+                    const ringOffset = c * 25;
+                    const r = wave.radius - ringOffset;
+                    
+                    if (r > 0) {
+                        const ringAlpha = wave.alpha * (1 - r / wave.maxRadius) * 0.6;
+                        
+                        // Soft gradient ring
+                        const grad = ctx.createRadialGradient(wave.x, wave.y, r - 30, wave.x, wave.y, r + 30);
+                        grad.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, 0)`);
+                        grad.addColorStop(0.3, `rgba(${color.r}, ${color.g}, ${color.b}, ${ringAlpha})`);
+                        grad.addColorStop(0.5, `rgba(${color.r}, ${color.g}, ${color.b}, ${ringAlpha * 1.5})`);
+                        grad.addColorStop(0.7, `rgba(${color.r}, ${color.g}, ${color.b}, ${ringAlpha})`);
+                        grad.addColorStop(1, `rgba(${color.r}, ${color.g}, ${color.b}, 0)`);
+                        
+                        ctx.beginPath();
+                        ctx.arc(wave.x, wave.y, r, 0, Math.PI * 2);
+                        ctx.fillStyle = grad;
+                        ctx.fill();
+                    }
+                }
+                
+                // Interference patterns where waves overlap
+                drawInterference(wave);
+            }
+        }
+        
+        function drawInterference(wave) {
+            if (waves.length < 2) return;
+            
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            
+            for (let i = 0; i < waves.length - 1; i++) {
+                const w1 = waves[i];
+                const w2 = waves[i + 1];
+                
+                // Check if rings are close
+                if (Math.abs(w1.radius - w2.radius) < 60) {
+                    const midX = (w1.x + w2.x) / 2;
+                    const midY = (w1.y + w2.y) / 2;
+                    const dist = Math.sqrt((w1.x - w2.x) ** 2 + (w1.y - w2.y) ** 2);
+                    
+                    if (dist > 100) {
+                        const interferenceR = (w1.radius + w2.radius) / 2;
+                        const interferenceAlpha = Math.min(w1.alpha, w2.alpha) * 0.3;
+                        
+                        // Iridescent interference spot
+                        const iriGrad = ctx.createRadialGradient(midX, midY, 0, midX, midY, 80);
+                        iriGrad.addColorStop(0, `rgba(150, 255, 200, ${interferenceAlpha})`);
+                        iriGrad.addColorStop(0.3, `rgba(200, 150, 255, ${interferenceAlpha * 0.7})`);
+                        iriGrad.addColorStop(0.6, `rgba(100, 200, 255, ${interferenceAlpha * 0.5})`);
+                        iriGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                        
+                        ctx.beginPath();
+                        ctx.arc(midX, midY, 80, 0, Math.PI * 2);
+                        ctx.fillStyle = iriGrad;
+                        ctx.fill();
+                    }
+                }
+            }
+            
+            ctx.restore();
+        }
+        
+        // === BIOLUMINESCENT PLANKTON ===
+        const biolumParticles = [];
+        const BIOLUM_COUNT = 150;
+        
+        class BiolumParticle {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = height * 0.75 + Math.random() * height * 0.25;
+                this.baseAlpha = Math.random() * 0.2 + 0.05;
+                this.alpha = this.baseAlpha;
+                this.size = Math.random() * 3 + 1;
+                this.pulseSpeed = Math.random() * 0.05 + 0.02;
+                this.pulse = Math.random() * Math.PI * 2;
+                this.lit = false;
+                this.litTimer = 0;
+                this.hue = Math.random() > 0.5 ? 180 : 160; // blue-green range
+            }
+            
+            update() {
+                this.pulse += this.pulseSpeed;
+                this.alpha = this.baseAlpha + Math.sin(this.pulse) * 0.05;
+                
+                if (this.lit) {
+                    this.litTimer -= 0.015;
+                    this.alpha = Math.max(this.baseAlpha, this.litTimer * 2);
+                    if (this.litTimer <= 0) {
+                        this.lit = false;
+                    }
+                }
+            }
+            
+            lightUp(waveX, waveY) {
+                this.lit = true;
+                this.litTimer = 1.5;
+            }
+            
+            draw() {
+                if (this.alpha <= 0) return;
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                
+                const color = this.lit ? 
+                    `hsla(${this.hue}, 100%, 70%, ${this.alpha})` :
+                    `hsla(${this.hue}, 60%, 50%, ${this.alpha})`;
+                ctx.fillStyle = color;
+                ctx.fill();
+                
+                // Glow
+                if (this.lit) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size * 3, 0, Math.PI * 2);
+                    ctx.fillStyle = `hsla(${this.hue}, 100%, 60%, ${this.alpha * 0.3})`;
+                    ctx.fill();
+                }
+            }
+        }
+        
+        for (let i = 0; i < BIOLUM_COUNT; i++) {
+            biolumParticles.push(new BiolumParticle());
+        }
+        
+        function triggerBioluminescence(wave) {
+            for (const p of biolumParticles) {
+                const dx = p.x - wave.x;
+                const dy = p.y - wave.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < wave.radius + 50 && dist > wave.radius - 50) {
+                    p.lightUp(wave.x, wave.y);
+                }
+            }
+        }
+        
+        // === BACKGROUND ===
+        function drawBackground() {
+            const grad = ctx.createLinearGradient(0, 0, 0, height);
+            grad.addColorStop(0, '#1a1a3a');
+            grad.addColorStop(0.3, '#0f1525');
+            grad.addColorStop(0.6, '#0a0f1a');
+            grad.addColorStop(1, '#050810');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+        }
+        
+        // === AMBIENT DEPTH GLOW ===
+        function drawDepthGlow() {
+            // Subtle light from above (surface light penetrating)
+            const topGlow = ctx.createRadialGradient(width / 2, -height * 0.3, 0, width / 2, -height * 0.3, height);
+            topGlow.addColorStop(0, 'rgba(40, 60, 100, 0.15)');
+            topGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = topGlow;
+            ctx.fillRect(0, 0, width, height);
+            
+            // Bottom bioluminescent glow
+            const bottomGlow = ctx.createLinearGradient(0, height * 0.8, 0, height);
+            bottomGlow.addColorStop(0, 'rgba(0, 50, 80, 0)');
+            bottomGlow.addColorStop(1, 'rgba(0, 30, 50, 0.3)');
+            ctx.fillStyle = bottomGlow;
+            ctx.fillRect(0, height * 0.8, width, height * 0.2);
+        }
+        
+        // === UNDERWATER PARTICLES / FLOATING DEBRIS ===
+        const ambientParticles = [];
+        for (let i = 0; i < 100; i++) {
+            ambientParticles.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                size: Math.random() * 4 + 2,
+                alpha: Math.random() * 0.1 + 0.05,
+                speedX: (Math.random() - 0.5) * 0.2,
+                speedY: Math.random() * 0.1 + 0.05
+            });
+        }
+        
+        function drawAmbientParticles() {
+            for (const p of ambientParticles) {
+                p.x += p.speedX;
+                p.y += p.speedY;
+                if (p.y > height) p.y = -10;
+                if (p.x < 0) p.x = width;
+                if (p.x > width) p.x = 0;
+                
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(150, 180, 200, ${p.alpha})`;
+                ctx.fill();
+            }
+        }
+        
+        // === MAIN LOOP ===
+        let lastTime = 0;
+        
+        function animate(currentTime) {
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+            
+            // Update whale
+            whale.x += whale.speed;
+            if (whale.x > width + 500) {
+                whale.x = -500;
+            }
+            
+            whale.tailPhase += whale.tailSpeed;
+            whale.bodyWave += whale.bodyWaveSpeed;
+            
+            // Gentle vertical movement
+            whale.y = whale.baseY + Math.sin(currentTime * 0.001) * 15;
+            
+            // Trigger song
+            if (currentTime > nextWaveTime) {
+                createWave(whale.x - 100, whale.y);
+                nextWaveTime = currentTime + 8000 + Math.random() * 2000;
+            }
+            
+            // Update
+            updateWaves();
+            particles.forEach(p => p.update(currentTime));
+            biolumParticles.forEach(p => p.update());
+            
+            // Draw
+            drawBackground();
+            drawDepthGlow();
+            drawAmbientParticles();
+            
+            // Draw bioluminescence layer (behind whale)
+            biolumParticles.forEach(p => p.draw());
+            
+            // Draw whale
+            drawWhale(currentTime);
+            
+            // Draw waves (on top)
+            drawWaves();
+            
+            // Draw marine snow (on top of everything)
+            particles.forEach(p => p.draw());
+            
+            // Vignette
+            const vignette = ctx.createRadialGradient(width/2, height/2, height * 0.3, width/2, height/2, height);
+            vignette.addColorStop(0, 'rgba(0,0,0,0)');
+            vignette.addColorStop(1, 'rgba(0,0,0,0.6)');
+            ctx.fillStyle = vignette;
+            ctx.fillRect(0, 0, width, height);
+            
+            requestAnimationFrame(animate);
+        }
+        
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>

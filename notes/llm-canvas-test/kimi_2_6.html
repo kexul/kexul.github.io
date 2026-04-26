@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deep Ocean — 500 Meters</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #010208; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="ocean"></canvas>
+<script>
+const canvas = document.getElementById('ocean');
+const ctx = canvas.getContext('2d');
+
+let width, height;
+function resize() {
+  width = canvas.width = window.innerWidth;
+  height = canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ─── Marine Snow ─── */
+const SNOW_COUNT = 2000;
+const snow = [];
+
+class Snow {
+  constructor() {
+    this.reset(true);
+  }
+  reset(initial = false) {
+    this.x = Math.random() * width;
+    this.y = initial ? Math.random() * height : -5;
+    this.size = Math.random() * 1.2 + 0.3;
+    this.speed = Math.random() * 0.22 + 0.06;
+    this.swayPhase = Math.random() * Math.PI * 2;
+    this.swaySpeed = Math.random() * 0.0008 + 0.00025;
+    this.swayAmp = Math.random() * 0.35 + 0.08;
+    this.vx = 0;
+    this.vy = 0;
+    this.opacity = Math.random() * 0.4 + 0.15;
+    this.layer = Math.random() < 0.3 ? 'far' : 'near'; // 30% behind whale
+  }
+  update(time, waves) {
+    this.vx *= 0.9;
+    this.vy *= 0.9;
+
+    const currentX = Math.sin(time * 0.0003 + this.y * 0.008) * 0.2 +
+                     Math.sin(time * 0.00012 + this.x * 0.003) * 0.12;
+    const currentY = Math.cos(time * 0.00022 + this.x * 0.004) * 0.06;
+
+    this.y += this.speed + this.vy + currentY;
+    this.x += Math.sin(time * this.swaySpeed + this.swayPhase) * this.swayAmp + this.vx + currentX;
+
+    for (let w of waves) {
+      if (time < w.startTime || w.alpha < 0.04) continue;
+      const dx = this.x - w.x;
+      const dy = this.y - w.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const diff = dist - w.radius;
+      if (Math.abs(diff) < w.thickness) {
+        const proximity = 1 - Math.abs(diff) / w.thickness;
+        const force = proximity * w.alpha * 1.1;
+        const nx = dx / (dist || 1);
+        const ny = dy / (dist || 1);
+        this.vx += nx * force;
+        this.vy += ny * force * 0.55;
+      }
+    }
+
+    if (this.y > height + 5) this.reset();
+    if (this.x < -10) this.x = width + 10;
+    if (this.x > width + 10) this.x = -10;
+  }
+  draw(ctx) {
+    ctx.fillStyle = `rgba(220, 235, 255, ${this.opacity})`;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+for (let i = 0; i < SNOW_COUNT; i++) snow.push(new Snow());
+
+/* ─── Bioluminescent Plankton ─── */
+const PLANKTON_COUNT = 280;
+const plankton = [];
+
+class Plankton {
+  constructor() {
+    this.x = Math.random() * width;
+    this.y = height - (Math.random() * height * 0.12 + 15);
+    this.size = Math.random() * 1.8 + 0.4;
+    this.brightness = 0;
+    this.baseAlpha = Math.random() * 0.12 + 0.03;
+  }
+  update(waves, time) {
+    this.brightness *= 0.93;
+    for (let w of waves) {
+      if (time < w.startTime || w.alpha < 0.05) continue;
+      const dx = this.x - w.x;
+      const dy = this.y - w.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const diff = Math.abs(dist - w.radius);
+      if (diff < 90) {
+        const hit = w.alpha * (1 - diff / 90);
+        if (hit > this.brightness) this.brightness = hit;
+      }
+    }
+  }
+  draw(ctx) {
+    if (this.brightness < 0.008) {
+      ctx.fillStyle = `rgba(30, 90, 110, ${this.baseAlpha})`;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      const b = this.brightness;
+      ctx.fillStyle = `rgba(100, 255, 230, ${b * 0.85 + this.baseAlpha})`;
+      ctx.shadowColor = `rgba(80, 255, 220, ${b})`;
+      ctx.shadowBlur = 18 * b;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size * (1 + b * 0.7), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+}
+
+for (let i = 0; i < PLANKTON_COUNT; i++) plankton.push(new Plankton());
+
+/* ─── Pressure Waves (Whale Song) ─── */
+const waves = [];
+
+class Wave {
+  constructor(x, y, type, startTime) {
+    this.x = x;
+    this.y = y;
+    this.type = type;
+    this.startTime = startTime;
+    this.radius = 0;
+    this.alpha = 0;
+    this.thickness = 55;
+    if (type === 'teal') {
+      this.r = 0; this.g = 150; this.b = 155; this.decay = 0.55; this.speed = 0.85;
+    } else if (type === 'blueviolet') {
+      this.r = 95; this.g = 50; this.b = 195; this.decay = 0.8; this.speed = 1.0;
+    } else {
+      this.r = 195; this.g = 165; this.b = 55; this.decay = 1.25; this.speed = 1.15;
+    }
+  }
+  update(time) {
+    if (time < this.startTime) return true;
+    const age = time - this.startTime;
+    this.radius = age * 0.075 * this.speed;
+    const progress = age / 5500;
+    this.alpha = Math.max(0, 1 - progress * this.decay);
+    return this.alpha > 0.005 && this.radius < Math.max(width, height) * 1.1;
+  }
+  draw(ctx) {
+    if (this.alpha <= 0) return;
+    const a = this.alpha;
+    const r = this.radius;
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+
+    ctx.strokeStyle = `rgba(${this.r},${this.g},${this.b},${a * 0.10})`;
+    ctx.lineWidth = this.thickness * 1.6;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(${this.r},${this.g},${this.b},${a * 0.22})`;
+    ctx.lineWidth = this.thickness * 0.7;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(${this.r},${this.g},${this.b},${a * 0.40})`;
+    ctx.lineWidth = this.thickness * 0.22;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, r * 0.96, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+/* ─── Blue Whale ─── */
+class Whale {
+  constructor() {
+    this.x = -420;
+    this.y = height * 0.30;
+    this.speed = 0.28;
+    this.tailPhase = 0;
+    this.lastSongTime = performance.now() + Math.random() * 6000;
+    this.songInterval = 8000 + Math.random() * 2000;
+    this.targetY = this.y;
+  }
+  update(time) {
+    this.x += this.speed;
+    if (this.x > width + 420) {
+      this.x = -420;
+      this.targetY = height * 0.22 + Math.random() * height * 0.18;
+    }
+    // Gentle vertical drift toward target depth
+    this.y += (this.targetY - this.y) * 0.002 + Math.sin(time * 0.00013) * 0.12;
+
+    // Tail sweep — powerful, elegant, every few seconds
+    this.tailPhase = Math.sin(time * 0.00135) * 0.38;
+
+    // Sing every 8–10 seconds
+    if (time - this.lastSongTime > this.songInterval) {
+      this.sing(time);
+      this.lastSongTime = time;
+      this.songInterval = 8000 + Math.random() * 2000;
+    }
+  }
+  sing(time) {
+    const tx = this.x + 105;
+    const ty = this.y + 18;
+    waves.push(new Wave(tx, ty, 'teal', time));
+    waves.push(new Wave(tx, ty, 'blueviolet', time + 280));
+    waves.push(new Wave(tx, ty, 'gold', time + 560));
+  }
+  draw(ctx) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+
+    const bodyColor = '#3a5a7a';
+    const bellyColor = '#b4c8d8';
+
+    /* Tail flukes */
+    ctx.save();
+    ctx.translate(-168, 0);
+    ctx.rotate(this.tailPhase);
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(-18, -28, -40, -38, -65, -32);
+    ctx.bezierCurveTo(-55, -15, -28, -8, -6, -2);
+    ctx.bezierCurveTo(-28, 8, -55, 15, -65, 32);
+    ctx.bezierCurveTo(-40, 38, -18, 28, 0, 0);
+    ctx.fill();
+    ctx.restore();
+
+    /* Main body (dorsal side) */
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.moveTo(158, 0);
+    ctx.bezierCurveTo(155, -38, 110, -58, 50, -58);
+    ctx.bezierCurveTo(-20, -58, -90, -50, -140, -32);
+    ctx.bezierCurveTo(-160, -22, -170, -12, -172, 0);
+    ctx.bezierCurveTo(-170, 12, -160, 22, -140, 32);
+    ctx.bezierCurveTo(-90, 50, -20, 58, 50, 56);
+    ctx.bezierCurveTo(110, 54, 152, 38, 158, 0);
+    ctx.fill();
+
+    /* Belly (pale) */
+    ctx.fillStyle = bellyColor;
+    ctx.beginPath();
+    ctx.moveTo(148, 2);
+    ctx.bezierCurveTo(140, 32, 90, 52, 30, 54);
+    ctx.bezierCurveTo(-30, 55, -90, 48, -135, 24);
+    ctx.bezierCurveTo(-90, 34, -30, 36, 30, 32);
+    ctx.bezierCurveTo(90, 28, 130, 18, 148, 2);
+    ctx.fill();
+
+    /* Throat grooves */
+    ctx.strokeStyle = 'rgba(70, 95, 115, 0.22)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      ctx.moveTo(115 - i * 16, 6);
+      ctx.quadraticCurveTo(55 - i * 10, 32, -10 - i * 4, 24);
+      ctx.stroke();
+    }
+
+    /* Tiny dorsal fin */
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.moveTo(-55, -55);
+    ctx.quadraticCurveTo(-48, -72, -38, -75);
+    ctx.quadraticCurveTo(-42, -62, -45, -55);
+    ctx.fill();
+
+    /* Eye */
+    ctx.fillStyle = 'rgba(25, 35, 45, 0.55)';
+    ctx.beginPath();
+    ctx.arc(125, -10, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+const whale = new Whale();
+
+/* ─── Main Loop ─── */
+function animate(time) {
+  /* Background: deep indigo to midnight blue-black */
+  const grad = ctx.createLinearGradient(0, 0, 0, height);
+  grad.addColorStop(0, '#0b0f26');
+  grad.addColorStop(0.30, '#070b1b');
+  grad.addColorStop(0.60, '#040714');
+  grad.addColorStop(1, '#010208');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+
+  /* Plankton on the floor */
+  plankton.forEach(p => {
+    p.update(waves, time);
+    p.draw(ctx);
+  });
+
+  /* Far marine snow (behind whale) */
+  snow.forEach(s => {
+    if (s.layer === 'far') {
+      s.update(time, waves);
+      s.draw(ctx);
+    }
+  });
+
+  /* Pressure waves */
+  for (let i = waves.length - 1; i >= 0; i--) {
+    if (!waves[i].update(time)) waves.splice(i, 1);
+  }
+  waves.forEach(w => w.draw(ctx));
+
+  /* Whale */
+  whale.update(time);
+  whale.draw(ctx);
+
+  /* Near marine snow (in front) */
+  snow.forEach(s => {
+    if (s.layer === 'near') {
+      s.update(time, waves);
+      s.draw(ctx);
+    }
+  });
+
+  requestAnimationFrame(animate);
+}
+
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

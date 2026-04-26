@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deep Ocean — 500m</title>
+<style>
+* { margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #020810; }
+canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// --- Marine Snow ---
+const SNOW_COUNT = 1200;
+const snow = [];
+for (let i = 0; i < SNOW_COUNT; i++) {
+  snow.push({
+    x: Math.random() * 3000,
+    y: Math.random() * 2000,
+    r: Math.random() * 1.2 + 0.3,
+    vy: Math.random() * 0.15 + 0.08,
+    vx: Math.random() * 0.04 - 0.02,
+    drift: Math.random() * Math.PI * 2,
+    driftSpeed: Math.random() * 0.003 + 0.001,
+    alpha: Math.random() * 0.5 + 0.3,
+    shiverVx: 0,
+    shiverVy: 0
+  });
+}
+
+// --- Whale ---
+const whale = {
+  x: -400,
+  y: H * 0.38,
+  speed: 0.35,
+  tailPhase: 0,
+  tailFreq: 0.008,
+  bodyLength: 320,
+  bodyHeight: 55,
+  singTimer: 0,
+  singInterval: 480 + Math.random() * 120 // 8-10 seconds at 60fps
+};
+
+// --- Pressure Waves ---
+const waves = [];
+const WAVE_COLORS = [
+  { r: 0, g: 128, b: 128, label: 'teal' },
+  { r: 100, g: 60, b: 180, label: 'violet' },
+  { r: 200, g: 170, b: 60, label: 'gold' }
+];
+
+function spawnWave(x, y) {
+  for (let i = 0; i < WAVE_COLORS.length; i++) {
+    const c = WAVE_COLORS[i];
+    waves.push({
+      x, y,
+      radius: 5,
+      maxRadius: 600 + Math.random() * 200,
+      speed: 1.8 + i * 0.3,
+      r: c.r, g: c.g, b: c.b,
+      decayRate: c.label === 'gold' ? 0.003 : c.label === 'violet' ? 0.0018 : 0.0012,
+      alpha: 0.7,
+      thickness: c.label === 'gold' ? 2 : c.label === 'violet' ? 4 : 5,
+      born: performance.now()
+    });
+  }
+}
+
+// --- Bioluminescent Plankton ---
+const PLANKTON_COUNT = 350;
+const plankton = [];
+for (let i = 0; i < PLANKTON_COUNT; i++) {
+  plankton.push({
+    x: Math.random() * 3000,
+    y: H * 0.82 + Math.random() * H * 0.18,
+    r: Math.random() * 2.5 + 1,
+    baseAlpha: Math.random() * 0.15 + 0.05,
+    alpha: 0,
+    glowAlpha: 0,
+    phase: Math.random() * Math.PI * 2,
+    blinkSpeed: Math.random() * 0.02 + 0.01
+  });
+}
+
+// --- Draw Background ---
+function drawBackground() {
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#0a1628');
+  grad.addColorStop(0.4, '#060f20');
+  grad.addColorStop(0.7, '#040a18');
+  grad.addColorStop(1, '#020508');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// --- Draw Marine Snow ---
+function drawSnow() {
+  for (const s of snow) {
+    s.drift += s.driftSpeed;
+    s.x += s.vx + Math.sin(s.drift) * 0.12 + s.shiverVx;
+    s.y += s.vy + s.shiverVy;
+    s.shiverVx *= 0.92;
+    s.shiverVy *= 0.92;
+    if (s.x < -50) s.x += W + 100;
+    if (s.x > W + 50) s.x -= W + 100;
+    if (s.y > H + 10) { s.y = -10; s.x = Math.random() * W; }
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(220,230,255,${s.alpha})`;
+    ctx.fill();
+  }
+}
+
+// --- Whale Shape ---
+function drawWhale() {
+  whale.x += whale.speed;
+  whale.y = H * 0.38 + Math.sin(whale.tailPhase * 0.5) * 8;
+  whale.tailPhase += whale.tailFreq;
+
+  // Sing timer
+  whale.singTimer++;
+  if (whale.singTimer >= whale.singInterval) {
+    whale.singTimer = 0;
+    whale.singInterval = 480 + Math.random() * 120;
+    // Throat position
+    const throatX = whale.x + whale.bodyLength * 0.35;
+    const throatY = whale.y;
+    spawnWave(throatX, throatY);
+  }
+
+  const cx = whale.x;
+  const cy = whale.y;
+  const L = whale.bodyLength;
+  const tailSwing = Math.sin(whale.tailPhase) * 18;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // Body path — elliptical whale shape with undulating tail
+  ctx.beginPath();
+  // Top line: head to tail
+  const segments = 40;
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const bx = -L * 0.5 + t * L;
+    // Width envelope: fatter at head, tapering to tail
+    let bodyW;
+    if (t < 0.15) {
+      bodyW = whale.bodyHeight * (0.6 + 0.4 * (t / 0.15));
+    } else if (t < 0.55) {
+      bodyW = whale.bodyHeight;
+    } else {
+      const tt = (t - 0.55) / 0.45;
+      bodyW = whale.bodyHeight * (1 - tt * tt * 0.95);
+    }
+    // Tail undulation
+    const undulation = t > 0.6 ? tailSwing * ((t - 0.6) / 0.4) ** 1.5 : 0;
+    const py = -bodyW + undulation;
+    if (i === 0) ctx.moveTo(bx, py);
+    else ctx.lineTo(bx, py);
+  }
+  // Tail flukes
+  const tailX = L * 0.5;
+  const tailY = tailSwing;
+  ctx.lineTo(tailX + 25, tailY - 20 + tailSwing * 0.5);
+  ctx.moveTo(tailX, tailY);
+  ctx.lineTo(tailX + 25, tailY + 20 + tailSwing * 0.5);
+  // Bottom line: tail to head (belly)
+  for (let i = segments; i >= 0; i--) {
+    const t = i / segments;
+    const bx = -L * 0.5 + t * L;
+    let bodyW;
+    if (t < 0.15) {
+      bodyW = whale.bodyHeight * (0.6 + 0.4 * (t / 0.15));
+    } else if (t < 0.55) {
+      bodyW = whale.bodyHeight * 1.25; // belly wider
+    } else {
+      const tt = (t - 0.55) / 0.45;
+      bodyW = whale.bodyHeight * 1.25 * (1 - tt * tt * 0.95);
+    }
+    const undulation = t > 0.6 ? tailSwing * ((t - 0.6) / 0.4) ** 1.5 : 0;
+    const py = bodyW + undulation;
+    ctx.lineTo(bx, py);
+  }
+  ctx.closePath();
+
+  // Gradient: grey-blue top, pale belly
+  const bodyGrad = ctx.createLinearGradient(0, -whale.bodyHeight, 0, whale.bodyHeight * 1.25);
+  bodyGrad.addColorStop(0, '#4a6070');
+  bodyGrad.addColorStop(0.45, '#5a7585');
+  bodyGrad.addColorStop(0.55, '#8aa0a8');
+  bodyGrad.addColorStop(1, '#b0c4cc');
+  ctx.fillStyle = bodyGrad;
+  ctx.fill();
+
+  // Eye
+  const eyeX = -L * 0.35;
+  const eyeY = -whale.bodyHeight * 0.15;
+  ctx.beginPath();
+  ctx.arc(eyeX, eyeY, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a2a3a';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(eyeX + 1, eyeY - 1, 1.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#8090a0';
+  ctx.fill();
+
+  // Mouth line
+  ctx.beginPath();
+  ctx.moveTo(-L * 0.42, whale.bodyHeight * 0.3);
+  ctx.quadraticCurveTo(-L * 0.2, whale.bodyHeight * 0.55, L * 0.05, whale.bodyHeight * 0.4);
+  ctx.strokeStyle = 'rgba(30,50,60,0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Throat pleats (subtle lines on underside)
+  for (let i = 0; i < 6; i++) {
+    const px = -L * 0.3 + i * L * 0.08;
+    ctx.beginPath();
+    ctx.moveTo(px, whale.bodyHeight * 0.5);
+    ctx.lineTo(px + L * 0.06, whale.bodyHeight * 0.9);
+    ctx.strokeStyle = 'rgba(40,70,80,0.2)';
+    ctx.lineWidth = 0.7;
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// --- Draw Pressure Waves ---
+function drawWaves() {
+  for (let i = waves.length - 1; i >= 0; i--) {
+    const w = waves[i];
+    w.radius += w.speed;
+    w.alpha -= w.decayRate;
+    if (w.alpha <= 0 || w.radius > w.maxRadius) {
+      waves.splice(i, 1);
+      continue;
+    }
+
+    // Check overlap for interference
+    // Draw the wave ring
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(w.x, w.y, w.radius, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${w.r},${w.g},${w.b},${w.alpha})`;
+    ctx.lineWidth = w.thickness;
+    ctx.shadowColor = `rgba(${w.r},${w.g},${w.b},${w.alpha * 0.5})`;
+    ctx.shadowBlur = 12;
+    ctx.stroke();
+    ctx.restore();
+
+    // Shiver nearby marine snow
+    for (const s of snow) {
+      const dx = s.x - w.x;
+      const dy = s.y - w.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (Math.abs(dist - w.radius) < 15) {
+        const force = w.alpha * 0.6;
+        const angle = Math.atan2(dy, dx);
+        s.shiverVx += Math.cos(angle) * force;
+        s.shiverVy += Math.sin(angle) * force;
+      }
+    }
+
+    // Activate plankton
+    for (const p of plankton) {
+      const dx = p.x - w.x;
+      const dy = p.y - w.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (Math.abs(dist - w.radius) < 30) {
+        p.glowAlpha = Math.min(1, p.glowAlpha + w.alpha * 0.8);
+      }
+    }
+  }
+}
+
+// --- Draw Interference Patterns ---
+function drawInterference() {
+  // Find overlapping wave fronts
+  for (let i = 0; i < waves.length; i++) {
+    for (let j = i + 1; j < waves.length; j++) {
+      const a = waves[i];
+      const b = waves[j];
+      if (a.alpha < 0.05 || b.alpha < 0.05) continue;
+
+      // Find intersection region
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d > a.radius + b.radius || d < Math.abs(a.radius - b.radius)) continue;
+
+      // Draw iridescent shimmer at overlap
+      const minOverlapAlpha = Math.min(a.alpha, b.alpha);
+      const iridescentAlpha = minOverlapAlpha * 0.4;
+
+      // Calculate intersection points
+      const ex = (d * d - b.radius * b.radius + a.radius * a.radius) / (2 * d);
+      const fx = a.x + dx * ex / d;
+      const fy = a.y + dy * ex / d;
+
+      // Offset perpendicular for band effect
+      const perpX = -dy / d;
+      const perpY = dx / d;
+      const halfChord = Math.sqrt(Math.max(0, a.radius * a.radius - ex * ex));
+
+      // Draw shimmering band
+      for (let k = -1; k <= 1; k++) {
+        const offX = fx + perpX * k * halfChord * 0.5;
+        const offY = fy + perpY * k * halfChord * 0.5;
+
+        const shimmer = ctx.createRadialGradient(offX, offY, 0, offX, offY, 20 + halfChord * 0.15);
+        const hue = (performance.now() * 0.05 + k * 60 + i * 120) % 360;
+        shimmer.addColorStop(0, `hsla(${hue}, 80%, 70%, ${iridescentAlpha})`);
+        shimmer.addColorStop(0.5, `hsla(${(hue + 40) % 360}, 60%, 55%, ${iridescentAlpha * 0.5})`);
+        shimmer.addColorStop(1, `hsla(${(hue + 80) % 360}, 40%, 40%, 0)`);
+
+        ctx.fillStyle = shimmer;
+        ctx.beginPath();
+        ctx.arc(offX, offY, 20 + halfChord * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+}
+
+// --- Draw Bottom Glow (ambient floor light) ---
+function drawFloorGlow() {
+  const grad = ctx.createLinearGradient(0, H * 0.85, 0, H);
+  grad.addColorStop(0, 'rgba(5,15,25,0)');
+  grad.addColorStop(1, 'rgba(8,20,30,0.3)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, H * 0.85, W, H * 0.15);
+}
+
+// --- Draw Bioluminescent Plankton ---
+function drawPlankton() {
+  for (const p of plankton) {
+    p.phase += p.blinkSpeed;
+    const baseBlink = (Math.sin(p.phase) * 0.5 + 0.5) * p.baseAlpha;
+
+    // Glow fades over time
+    p.glowAlpha *= 0.985;
+    const finalAlpha = Math.min(1, baseBlink + p.glowAlpha);
+
+    if (finalAlpha < 0.01) continue;
+
+    // Outer glow
+    if (p.glowAlpha > 0.05) {
+      const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 6);
+      glow.addColorStop(0, `rgba(80,220,200,${p.glowAlpha * 0.4})`);
+      glow.addColorStop(0.4, `rgba(40,180,170,${p.glowAlpha * 0.2})`);
+      glow.addColorStop(1, 'rgba(20,100,100,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Core
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(140,255,240,${finalAlpha})`;
+    ctx.fill();
+  }
+}
+
+// --- Subtle deep light rays ---
+function drawLightRays(t) {
+  ctx.save();
+  ctx.globalAlpha = 0.015;
+  for (let i = 0; i < 3; i++) {
+    const x = W * 0.2 + i * W * 0.3 + Math.sin(t * 0.0002 + i) * 50;
+    const grad = ctx.createLinearGradient(x, 0, x + 30, H * 0.6);
+    grad.addColorStop(0, '#4488aa');
+    grad.addColorStop(1, 'rgba(20,40,60,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(x - 15, 0);
+    ctx.lineTo(x + 50, H * 0.6);
+    ctx.lineTo(x + 20, H * 0.6);
+    ctx.lineTo(x - 40, 0);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// --- Reset whale position when off screen ---
+function resetWhale() {
+  if (whale.x - whale.bodyLength > W + 100) {
+    whale.x = -whale.bodyLength - 200;
+    whale.y = H * 0.35 + Math.random() * H * 0.1;
+  }
+}
+
+// --- Main Loop ---
+let startTime = performance.now();
+
+function animate() {
+  const t = performance.now() - startTime;
+
+  ctx.clearRect(0, 0, W, H);
+
+  drawBackground();
+  drawLightRays(t);
+  drawSnow();
+  drawWhale();
+  drawWaves();
+  drawInterference();
+  drawFloorGlow();
+  drawPlankton();
+
+  resetWhale();
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>
